@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import questionary
+
+from workstation_setup.exec import command_exists
+from workstation_setup.providers.brew import BrewProvider
+from workstation_setup.steps.base import Step, StepResult, StepStatus
+from workstation_setup.ui import prompts
+
+if TYPE_CHECKING:
+    from workstation_setup.context import RunContext
+
+CURATED_PLUGINS = ["nodejs", "python", "erlang", "elixir", "ruby", "golang"]
+OTHER_CHOICE = "__other__"
+ALREADY_ADDED_MARKER = "already added"
+
+
+class InstallAsdfStep(Step):
+    id = "asdf"
+    title = "asdf"
+    description = "Install the asdf version manager via Homebrew."
+
+    def check_installed(self, ctx: RunContext) -> StepStatus:
+        if command_exists("asdf"):
+            return StepStatus.ALREADY_INSTALLED
+        return StepStatus.NOT_INSTALLED
+
+    def run(self, ctx: RunContext) -> StepResult:
+        BrewProvider().install(ctx, "asdf")
+        return StepResult(StepStatus.INSTALLED)
+
+    def dry_run_preview(self, ctx: RunContext) -> list[str]:
+        return ["brew install asdf"]
+
+
+class AsdfPluginsStep(Step):
+    id = "asdf-plugins"
+    title = "asdf plugins"
+    description = "Add asdf plugins for the language runtimes you use."
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return command_exists("asdf")
+
+    def check_installed(self, ctx: RunContext) -> StepStatus:
+        # Always offered — picking no plugins is a valid, repeatable no-op.
+        return StepStatus.NOT_INSTALLED
+
+    def _select_plugins(self) -> list[str]:
+        choices = [questionary.Choice(title=name, value=name) for name in CURATED_PLUGINS]
+        choices.append(questionary.Choice(title="Other (type plugin name(s))", value=OTHER_CHOICE))
+        selected = prompts.checkbox_select("Which asdf plugins do you want to add?", choices)
+
+        plugins = [name for name in selected if name != OTHER_CHOICE]
+        if OTHER_CHOICE in selected:
+            typed = prompts.text_input("Enter additional plugin name(s), comma-separated:")
+            plugins += [name.strip() for name in typed.split(",") if name.strip()]
+        return plugins
+
+    def run(self, ctx: RunContext) -> StepResult:
+        plugins = self._select_plugins()
+        added = []
+        for plugin in plugins:
+            result = ctx.run_command(["asdf", "plugin", "add", plugin], check=False)
+            if result.ok or ALREADY_ADDED_MARKER in result.stderr.lower():
+                added.append(plugin)
+
+        if not added:
+            return StepResult(StepStatus.SKIPPED_BY_USER, detail="no plugins selected")
+        return StepResult(StepStatus.INSTALLED, detail=", ".join(added))
+
+    def dry_run_preview(self, ctx: RunContext) -> list[str]:
+        return ["Prompt for asdf plugins to add, then `asdf plugin add <name>` for each"]

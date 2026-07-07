@@ -1,0 +1,22 @@
+# Disposable environment for manually smoke-testing the real wizard on Linux.
+# Not part of the automated pytest suite — see tests/integration/README.md.
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl git sudo ca-certificates procps file \
+    python3 python3-venv python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Homebrew refuses to run as root, and most of the real install steps
+# (chsh, sudo apt-get install, ...) assume a normal sudo-capable user.
+RUN useradd -m -s /bin/bash dev && \
+    echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev
+
+USER dev
+WORKDIR /home/dev/workstation-setup
+COPY --chown=dev:dev . .
+
+RUN python3 -m venv .venv && \
+    .venv/bin/pip install -e ".[dev]" -q
+
+CMD ["/bin/bash"]

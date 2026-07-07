@@ -1,0 +1,47 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "workstation-setup"
+version = "0.1.0"
+description = "Interactive wizard that bootstraps a fresh Linux/macOS developer workstation."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = [
+    "click>=8.1",
+    "questionary>=2.0",
+    "rich>=13.7",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-mock>=3.14",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.10",
+    "pyinstaller>=6.10",
+]
+
+[project.scripts]
+workstation-setup = "workstation_setup.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/workstation_setup"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/unit"]
+
+[tool.mypy]
+python_version = "3.11"
+packages = ["workstation_setup"]
+ignore_missing_imports = true
