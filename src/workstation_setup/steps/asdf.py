@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import questionary
 
+from workstation_setup.errors import StepError
 from workstation_setup.exec import command_exists
 from workstation_setup.providers.brew import BrewProvider
 from workstation_setup.steps.base import Step, StepResult, StepStatus
@@ -60,14 +61,21 @@ class AsdfPluginsStep(Step):
 
     def run(self, ctx: RunContext) -> StepResult:
         plugins = self._select_plugins()
-        added = []
+        if not plugins:
+            return StepResult(StepStatus.SKIPPED_BY_USER, detail="no plugins selected")
+
+        added, failed = [], []
         for plugin in plugins:
             result = ctx.run_command(["asdf", "plugin", "add", plugin], check=False)
             if result.ok or ALREADY_ADDED_MARKER in result.stderr.lower():
                 added.append(plugin)
+            else:
+                failed.append(plugin)
 
         if not added:
-            return StepResult(StepStatus.SKIPPED_BY_USER, detail="no plugins selected")
+            raise StepError(f"Failed to add plugins: {', '.join(failed)}")
+        if failed:
+            return StepResult(StepStatus.PARTIAL, detail=f"added: {', '.join(added)}; failed: {', '.join(failed)}")
         return StepResult(StepStatus.INSTALLED, detail=", ".join(added))
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:

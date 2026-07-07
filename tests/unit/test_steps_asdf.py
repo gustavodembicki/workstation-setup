@@ -1,5 +1,7 @@
+import pytest
 from factories import make_context
 
+from workstation_setup.errors import StepError
 from workstation_setup.exec import CommandResult, FakeRunner
 from workstation_setup.providers.brew import BrewProvider
 from workstation_setup.steps import asdf as asdf_module
@@ -82,3 +84,34 @@ def test_plugins_step_no_selection_is_skipped(monkeypatch):
     result = AsdfPluginsStep().run(make_context())
 
     assert result.status == StepStatus.SKIPPED_BY_USER
+
+
+def test_plugins_step_all_fail_raises_step_error(monkeypatch):
+    monkeypatch.setattr(
+        asdf_module.prompts, "checkbox_select", lambda msg, choices: [asdf_module.OTHER_CHOICE]
+    )
+    monkeypatch.setattr(asdf_module.prompts, "text_input", lambda msg: "notreal")
+    runner = FakeRunner(default_result=CommandResult(1, "", "some error", []))
+    ctx = make_context(runner=runner)
+
+    with pytest.raises(StepError, match="notreal"):
+        AsdfPluginsStep().run(ctx)
+
+
+def test_plugins_step_partial_success(monkeypatch):
+    monkeypatch.setattr(
+        asdf_module.prompts, "checkbox_select", lambda msg, choices: ["nodejs", "ruby"]
+    )
+    ok = CommandResult(0, "", "", [])
+    fail = CommandResult(1, "", "some error", [])
+    runner = FakeRunner(responses={"asdf": fail})
+    runner.responses = {}
+    calls = iter([ok, fail])
+    runner.run = lambda args, **kw: (runner.calls.append(args), next(calls))[1]
+    ctx = make_context(runner=runner)
+
+    result = AsdfPluginsStep().run(ctx)
+
+    assert result.status == StepStatus.PARTIAL
+    assert "nodejs" in result.detail
+    assert "ruby" in result.detail

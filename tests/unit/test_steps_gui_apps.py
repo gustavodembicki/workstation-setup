@@ -100,7 +100,8 @@ def test_execute_deb_download_downloads_then_installs():
 
     _execute_install_method(ctx, InstallMethod("deb_download", "https://example.com/app.deb"))
 
-    assert runner.calls[0][:2] == ["curl", "-fsSL"]
+    assert runner.calls[0][:2] == ["curl", "-fSL"]
+    assert "--progress-bar" in runner.calls[0]
     assert runner.calls[1][:3] == ["sudo", "dpkg", "-i"]
 
 
@@ -130,7 +131,14 @@ def test_execute_appimage_downloads_to_applications_dir(tmp_path, monkeypatch):
     _execute_install_method(ctx, InstallMethod("appimage", "https://example.com/App.AppImage"))
 
     dest = str(tmp_path / "Applications" / "App.AppImage")
-    assert ["curl", "-fsSL", "-o", dest, "https://example.com/App.AppImage"] in runner.calls
+    assert [
+        "curl",
+        "-fSL",
+        "--progress-bar",
+        "-o",
+        dest,
+        "https://example.com/App.AppImage",
+    ] in runner.calls
     assert ["chmod", "+x", dest] in runner.calls
 
 
