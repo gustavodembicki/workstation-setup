@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING
@@ -8,6 +9,7 @@ from typing import TYPE_CHECKING
 from workstation_setup.exec import command_exists
 from workstation_setup.providers.brew import BrewProvider, resolve_brew_binary
 from workstation_setup.steps.base import Step, StepResult, StepStatus
+from workstation_setup.ui import prompts
 
 if TYPE_CHECKING:
     from workstation_setup.context import RunContext
@@ -58,37 +60,54 @@ class InstallOhMyZshStep(Step):
         return [f"Run the Oh My Zsh install script ({OH_MY_ZSH_INSTALL_URL}) non-interactively"]
 
 
-class InstallPowerlevel10kStep(Step):
-    id = "powerlevel10k"
-    title = "Powerlevel10k theme"
-    description = "Install the Powerlevel10k zsh theme via Homebrew and wire it into ~/.zshrc."
+class ConfigureZshThemeStep(Step):
+    id = "zsh-theme"
+    title = "ZSH theme"
+    description = "Choose and configure an oh-my-zsh theme in ~/.zshrc."
 
     def _zshrc(self) -> Path:
         return Path.home() / ".zshrc"
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
         zshrc = self._zshrc()
-        theme_wired = zshrc.exists() and P10K_SOURCE_LINE in zshrc.read_text()
-        if BrewProvider().is_installed(ctx, "powerlevel10k") and theme_wired:
+        if not zshrc.exists():
+            return StepStatus.NOT_INSTALLED
+        contents = zshrc.read_text()
+        if P10K_SOURCE_LINE in contents or "ZSH_THEME=" in contents:
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
     def run(self, ctx: RunContext) -> StepResult:
-        BrewProvider().install(ctx, "powerlevel10k")
+        theme = prompts.text_input(
+            "Which oh-my-zsh theme would you like?", default="powerlevel10k"
+        )
+        ctx.selections["zsh_theme"] = theme
+
         zshrc = self._zshrc()
         contents = zshrc.read_text() if zshrc.exists() else ""
-        if P10K_SOURCE_LINE not in contents:
-            with zshrc.open("a") as f:
-                if contents and not contents.endswith("\n"):
-                    f.write("\n")
-                f.write(P10K_SOURCE_LINE + "\n")
+
+        if theme == "powerlevel10k":
+            BrewProvider().install(ctx, "powerlevel10k")
+            if P10K_SOURCE_LINE not in contents:
+                with zshrc.open("a") as f:
+                    if contents and not contents.endswith("\n"):
+                        f.write("\n")
+                    f.write(P10K_SOURCE_LINE + "\n")
+        else:
+            theme_line = f'ZSH_THEME="{theme}"'
+            if re.search(r'^ZSH_THEME=', contents, re.MULTILINE):
+                new_contents = re.sub(r'^ZSH_THEME=.*$', theme_line, contents, flags=re.MULTILINE)
+                zshrc.write_text(new_contents)
+            else:
+                with zshrc.open("a") as f:
+                    if contents and not contents.endswith("\n"):
+                        f.write("\n")
+                    f.write(theme_line + "\n")
+
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
-        return [
-            "brew install powerlevel10k",
-            f"Append '{P10K_SOURCE_LINE}' to ~/.zshrc if missing",
-        ]
+        return ["Would prompt for ZSH theme (default: powerlevel10k) and configure ~/.zshrc"]
 
 
 class SetDefaultShellStep(Step):

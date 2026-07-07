@@ -7,8 +7,8 @@ from workstation_setup.providers.brew import BrewProvider
 from workstation_setup.steps import shell as shell_module
 from workstation_setup.steps.base import StepStatus
 from workstation_setup.steps.shell import (
+    ConfigureZshThemeStep,
     InstallOhMyZshStep,
-    InstallPowerlevel10kStep,
     InstallZshStep,
     SetDefaultShellStep,
 )
@@ -62,34 +62,77 @@ def test_oh_my_zsh_run_uses_bash_installer():
     assert result.status == StepStatus.INSTALLED
 
 
-def test_p10k_appends_source_line_when_missing(tmp_path, monkeypatch):
+def test_zsh_theme_check_installed_when_p10k_source_line_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    (tmp_path / ".zshrc").write_text(shell_module.P10K_SOURCE_LINE + "\n")
+
+    assert ConfigureZshThemeStep().check_installed(make_context()) == StepStatus.ALREADY_INSTALLED
+
+
+def test_zsh_theme_check_installed_when_zsh_theme_line_present(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    (tmp_path / ".zshrc").write_text('ZSH_THEME="robbyrussell"\n')
+
+    assert ConfigureZshThemeStep().check_installed(make_context()) == StepStatus.ALREADY_INSTALLED
+
+
+def test_zsh_theme_check_not_installed_when_no_theme_configured(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+
+    assert ConfigureZshThemeStep().check_installed(make_context()) == StepStatus.NOT_INSTALLED
+
+
+def test_zsh_theme_p10k_appends_source_line(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(BrewProvider, "install", lambda self, ctx, pkg, cask=False: None)
+    monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "powerlevel10k")
 
-    InstallPowerlevel10kStep().run(make_context())
+    ConfigureZshThemeStep().run(make_context())
 
     assert (tmp_path / ".zshrc").read_text().strip() == shell_module.P10K_SOURCE_LINE
 
 
-def test_p10k_run_is_idempotent_does_not_duplicate_line(tmp_path, monkeypatch):
+def test_zsh_theme_p10k_is_idempotent(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(BrewProvider, "install", lambda self, ctx, pkg, cask=False: None)
+    monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "powerlevel10k")
     zshrc = tmp_path / ".zshrc"
     zshrc.write_text(shell_module.P10K_SOURCE_LINE + "\n")
 
-    InstallPowerlevel10kStep().run(make_context())
+    ConfigureZshThemeStep().run(make_context())
 
     assert zshrc.read_text().count(shell_module.P10K_SOURCE_LINE) == 1
 
 
-def test_p10k_check_installed_already_when_brew_installed_and_wired(tmp_path, monkeypatch):
+def test_zsh_theme_bundled_writes_zsh_theme_line(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    monkeypatch.setattr(BrewProvider, "is_installed", lambda self, ctx, pkg: True)
-    (tmp_path / ".zshrc").write_text(shell_module.P10K_SOURCE_LINE + "\n")
+    monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "robbyrussell")
 
-    status = InstallPowerlevel10kStep().check_installed(make_context())
+    ConfigureZshThemeStep().run(make_context())
 
-    assert status == StepStatus.ALREADY_INSTALLED
+    assert (tmp_path / ".zshrc").read_text().strip() == 'ZSH_THEME="robbyrussell"'
+
+
+def test_zsh_theme_bundled_replaces_existing_zsh_theme_line(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "agnoster")
+    zshrc = tmp_path / ".zshrc"
+    zshrc.write_text('ZSH_THEME="robbyrussell"\n')
+
+    ConfigureZshThemeStep().run(make_context())
+
+    assert zshrc.read_text().strip() == 'ZSH_THEME="agnoster"'
+
+
+def test_zsh_theme_bundled_does_not_brew_install(tmp_path, monkeypatch):
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "robbyrussell")
+    installed = []
+    monkeypatch.setattr(BrewProvider, "install", lambda self, ctx, pkg, cask=False: installed.append(pkg))
+
+    ConfigureZshThemeStep().run(make_context())
+
+    assert installed == []
 
 
 def test_set_default_shell_already_installed_when_shell_matches(monkeypatch):

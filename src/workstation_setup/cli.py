@@ -17,8 +17,8 @@ from workstation_setup.steps.gui_apps import GuiAppsSelectionStep
 from workstation_setup.steps.homebrew import InstallHomebrewStep
 from workstation_setup.steps.ides import IdeSelectionStep
 from workstation_setup.steps.shell import (
+    ConfigureZshThemeStep,
     InstallOhMyZshStep,
-    InstallPowerlevel10kStep,
     InstallZshStep,
     SetDefaultShellStep,
 )
@@ -28,7 +28,7 @@ STEP_PIPELINE: list[Step] = [
     InstallHomebrewStep(),
     InstallZshStep(),
     InstallOhMyZshStep(),
-    InstallPowerlevel10kStep(),
+    ConfigureZshThemeStep(),
     SetDefaultShellStep(),
     InstallAsdfStep(),
     AsdfPluginsStep(),
