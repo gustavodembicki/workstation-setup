@@ -25,11 +25,15 @@ class InstallHomebrewStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
         # `bash -c "$(curl ...)"` only works when an outer shell performs the
         # substitution before bash starts; invoked directly via subprocess
         # (no outer shell), bash instead word-splits the fetched script into
         # a single bogus command. Piping avoids that gotcha entirely.
+        #
+        # The official installer itself is the only "reinstall" mechanism
+        # Homebrew offers — there's no `brew reinstall brew` — so `reinstall`
+        # just re-runs the same script, which is safe to run again.
         ctx.run_command(
             ["/bin/bash", "-c", f"curl -fsSL {INSTALL_SCRIPT_URL} | bash"],
             env={**os.environ, "NONINTERACTIVE": "1"},

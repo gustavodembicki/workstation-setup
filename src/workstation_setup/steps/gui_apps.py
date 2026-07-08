@@ -3,15 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import questionary
-
-from workstation_setup.errors import StepError, UnsupportedPlatformError
+from workstation_setup.errors import UnsupportedPlatformError
 from workstation_setup.providers.apt import AptProvider
 from workstation_setup.providers.registry import get_brew_provider
-from workstation_setup.registry.apps import APP_REGISTRY
 from workstation_setup.registry.models import AppSpec, InstallMethod
-from workstation_setup.steps.base import Step, StepResult, StepStatus
-from workstation_setup.ui import prompts
+from workstation_setup.steps.base import StepResult, StepStatus
 
 if TYPE_CHECKING:
     from workstation_setup.context import RunContext
@@ -37,12 +33,22 @@ def _download(ctx: RunContext, url: str, dest: str) -> None:
     ctx.run_command(["curl", "-fSL", "--progress-bar", "-o", dest, url], capture=False)
 
 
-def _execute_install_method(ctx: RunContext, method: InstallMethod) -> None:
+def _execute_install_method(
+    ctx: RunContext, method: InstallMethod, *, reinstall: bool = False
+) -> None:
     if method.kind == "brew_cask":
-        get_brew_provider().install(ctx, method.identifier, cask=True)
+        if reinstall:
+            get_brew_provider().reinstall(ctx, method.identifier, cask=True)
+        else:
+            get_brew_provider().install(ctx, method.identifier, cask=True)
     elif method.kind == "brew_formula":
-        get_brew_provider().install(ctx, method.identifier)
+        if reinstall:
+            get_brew_provider().reinstall(ctx, method.identifier)
+        else:
+            get_brew_provider().install(ctx, method.identifier)
     elif method.kind == "apt_repo":
+        # `reinstall` needs no special branch here: re-running the repo setup
+        # + apt-get install is safe and is itself the "reinstall" action.
         if method.repo_setup:
             method.repo_setup(ctx)
         ctx.run_command(["sudo", "apt-get", "update"])
@@ -69,13 +75,13 @@ def _execute_install_method(ctx: RunContext, method: InstallMethod) -> None:
         raise UnsupportedPlatformError(f"Unknown install method kind: {method.kind}")
 
 
-def install_app(ctx: RunContext, spec: AppSpec) -> StepResult:
+def install_app(ctx: RunContext, spec: AppSpec, *, reinstall: bool = False) -> StepResult:
     """Dispatch a single AppSpec's install per the current OS/distro. Shared
-    by both the GUI-apps step and the IDE step — they only differ in which
-    checkbox screen the entries show up on.
+    by every `AppSpecStep` (IDEs and everyday apps alike) — they only differ
+    in which registry they come from.
     """
     if ctx.os_info.family == "macos":
-        _execute_install_method(ctx, spec.macos)
+        _execute_install_method(ctx, spec.macos, reinstall=reinstall)
         return StepResult(StepStatus.INSTALLED)
 
     if ctx.os_info.family == "linux":
@@ -85,75 +91,9 @@ def install_app(ctx: RunContext, spec: AppSpec) -> StepResult:
                 StepStatus.UNSUPPORTED,
                 detail=f"no install method for {spec.display_name} on this distro",
             )
-        _execute_install_method(ctx, method)
+        _execute_install_method(ctx, method, reinstall=reinstall)
         return StepResult(StepStatus.INSTALLED)
 
     return StepResult(
         StepStatus.UNSUPPORTED, detail=f"{spec.display_name} not supported on {ctx.os_info.family}"
     )
-
-
-def run_selection_step(ctx: RunContext, title: str, registry: list[AppSpec]) -> StepResult:
-    choices = [
-        questionary.Choice(
-            title=f"{spec.display_name}{' (already installed)' if spec.check(ctx) else ''}",
-            value=spec.id,
-            checked=spec.check(ctx),
-        )
-        for spec in registry
-    ]
-    selected_ids = set(prompts.checkbox_select(f"Select {title.lower()} to install:", choices))
-
-    installed, failed, unsupported = [], [], []
-    for spec in registry:
-        if spec.id not in selected_ids:
-            continue
-        ctx.console.print(f"\n[bold]-> {spec.display_name}[/bold]")
-        try:
-            result = install_app(ctx, spec)
-        except StepError as error:
-            reason = str(error) + (f": {error.stderr}" if error.stderr else "")
-            ctx.console.print(f"[red]x {spec.display_name} failed - {reason}[/red]")
-            failed.append(f"{spec.display_name} ({reason})")
-            continue
-        except Exception as error:  # unexpected failure (fs/permissions/etc.), not just StepError
-            ctx.console.print(f"[red]x {spec.display_name} failed unexpectedly - {error}[/red]")
-            failed.append(f"{spec.display_name} ({error})")
-            continue
-
-        if result.status == StepStatus.UNSUPPORTED:
-            ctx.console.print(f"[yellow]! {spec.display_name} unsupported here[/yellow]")
-            unsupported.append(spec.display_name)
-        else:
-            ctx.console.print(f"[green]OK {spec.display_name} installed[/green]")
-            installed.append(spec.display_name)
-
-    if not selected_ids:
-        return StepResult(StepStatus.SKIPPED_BY_USER, detail="nothing selected")
-
-    detail_parts = [f"installed: {', '.join(installed) or 'none'}"]
-    if failed:
-        detail_parts.append(f"failed: {', '.join(failed)}")
-    if unsupported:
-        detail_parts.append(f"unsupported: {', '.join(unsupported)}")
-
-    status = StepStatus.INSTALLED if installed and not failed else StepStatus.PARTIAL
-    return StepResult(status, detail="; ".join(detail_parts))
-
-
-class GuiAppsSelectionStep(Step):
-    id = "gui-apps"
-    title = "Everyday apps"
-    description = (
-        "Pick everyday apps to install: Chrome, Slack, Spotify, GCloud SDK, Devin Desktop."
-    )
-
-    def check_installed(self, ctx: RunContext) -> StepStatus:
-        # Always offered — re-running lets the user add apps they skipped before.
-        return StepStatus.NOT_INSTALLED
-
-    def run(self, ctx: RunContext) -> StepResult:
-        return run_selection_step(ctx, self.title, APP_REGISTRY)
-
-    def dry_run_preview(self, ctx: RunContext) -> list[str]:
-        return [f"Prompt to select from: {', '.join(s.display_name for s in APP_REGISTRY)}"]

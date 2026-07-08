@@ -36,6 +36,20 @@ def test_run_invokes_official_install_script_with_noninteractive_env(monkeypatch
     assert ensure_path_calls == [ctx.os_info]
 
 
+def test_run_reinstall_reruns_the_same_install_script(monkeypatch):
+    # Homebrew has no `brew reinstall brew` — the official installer is the
+    # only mechanism, so `reinstall=True` is just re-running it.
+    monkeypatch.setattr(homebrew_module, "ensure_brew_on_path", lambda os_info: None)
+    runner = FakeRunner(default_result=CommandResult(0, "", "", []))
+    ctx = make_context(runner=runner)
+
+    result = InstallHomebrewStep().run(ctx, reinstall=True)
+
+    assert result.status == StepStatus.INSTALLED
+    [call_args] = runner.calls
+    assert call_args[0] == "/bin/bash"
+
+
 def test_dry_run_preview_mentions_install_script():
     ctx = make_context()
 

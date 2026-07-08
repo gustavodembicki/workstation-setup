@@ -28,8 +28,11 @@ class InstallAsdfStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
-        BrewProvider().install(ctx, "asdf")
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if reinstall:
+            BrewProvider().reinstall(ctx, "asdf")
+        else:
+            BrewProvider().install(ctx, "asdf")
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
@@ -59,7 +62,9 @@ class AsdfPluginsStep(Step):
             plugins += [name.strip() for name in typed.split(",") if name.strip()]
         return plugins
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        # Always "modify" — re-running re-opens the plugin picker so the
+        # user can add more, so `reinstall` needs no separate branch.
         plugins = self._select_plugins()
         if not plugins:
             return StepResult(StepStatus.SKIPPED_BY_USER, detail="no plugins selected")
@@ -75,7 +80,8 @@ class AsdfPluginsStep(Step):
         if not added:
             raise StepError(f"Failed to add plugins: {', '.join(failed)}")
         if failed:
-            return StepResult(StepStatus.PARTIAL, detail=f"added: {', '.join(added)}; failed: {', '.join(failed)}")
+            detail = f"added: {', '.join(added)}; failed: {', '.join(failed)}"
+            return StepResult(StepStatus.PARTIAL, detail=detail)
         return StepResult(StepStatus.INSTALLED, detail=", ".join(added))
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:

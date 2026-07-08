@@ -40,7 +40,9 @@ class GenerateSshKeyStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        # Already "modify" on every call — the overwrite confirmation below
+        # is the real gate, so `reinstall` needs no separate branch.
         ssh_dir, priv, pub = _key_paths()
 
         if priv.exists():

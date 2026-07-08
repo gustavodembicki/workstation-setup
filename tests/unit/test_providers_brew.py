@@ -84,6 +84,33 @@ def test_install_cask_on_linux_raises():
         BrewProvider().install(ctx, "google-chrome", cask=True)
 
 
+def test_reinstall_formula_calls_brew_reinstall():
+    runner = FakeRunner(default_result=CommandResult(0, "", "", []))
+    ctx = make_context(runner=runner)
+
+    BrewProvider().reinstall(ctx, "zsh")
+
+    assert runner.calls == [["brew", "reinstall", "zsh"]]
+
+
+def test_reinstall_cask_adds_cask_flag_on_macos():
+    runner = FakeRunner(default_result=CommandResult(0, "", "", []))
+    ctx = make_context(
+        os_info=make_os_info(family="macos", distro_family=None, arch="arm64"), runner=runner
+    )
+
+    BrewProvider().reinstall(ctx, "google-chrome", cask=True)
+
+    assert runner.calls == [["brew", "reinstall", "--cask", "google-chrome"]]
+
+
+def test_reinstall_cask_on_linux_raises():
+    ctx = make_context()  # linux by default
+
+    with pytest.raises(UnsupportedPlatformError):
+        BrewProvider().reinstall(ctx, "google-chrome", cask=True)
+
+
 def test_list_installed_parses_brew_list_output():
     runner = FakeRunner(default_result=CommandResult(0, "zsh 5.9\nasdf 0.14.0\n", "", []))
     ctx = make_context(runner=runner)

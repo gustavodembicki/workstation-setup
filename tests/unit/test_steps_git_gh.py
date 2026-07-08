@@ -37,6 +37,30 @@ def test_gh_run_installs_via_brew(monkeypatch):
     assert result.status == StepStatus.INSTALLED
 
 
+def test_git_run_reinstall_uses_brew_reinstall(monkeypatch):
+    reinstalled = []
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: reinstalled.append(pkg)
+    )
+
+    result = InstallGitStep().run(make_context(), reinstall=True)
+
+    assert reinstalled == ["git"]
+    assert result.status == StepStatus.INSTALLED
+
+
+def test_gh_run_reinstall_uses_brew_reinstall(monkeypatch):
+    reinstalled = []
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: reinstalled.append(pkg)
+    )
+
+    result = InstallGhStep().run(make_context(), reinstall=True)
+
+    assert reinstalled == ["gh"]
+    assert result.status == StepStatus.INSTALLED
+
+
 def test_gh_auth_login_is_applicable_only_when_gh_installed(monkeypatch):
     monkeypatch.setattr(git_gh_module, "command_exists", lambda name: False)
 

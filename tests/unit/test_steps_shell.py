@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from factories import make_context
 
 from workstation_setup.exec import CommandResult, FakeRunner
@@ -35,6 +36,23 @@ def test_zsh_run_installs_via_brew(monkeypatch):
     result = InstallZshStep().run(make_context())
 
     assert installed == ["zsh"]
+    assert result.status == StepStatus.INSTALLED
+
+
+def test_zsh_run_reinstall_uses_brew_reinstall(monkeypatch):
+    reinstalled = []
+
+    def fail_install(self, ctx, pkg, cask=False):
+        pytest.fail("should not install")
+
+    monkeypatch.setattr(BrewProvider, "install", fail_install)
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: reinstalled.append(pkg)
+    )
+
+    result = InstallZshStep().run(make_context(), reinstall=True)
+
+    assert reinstalled == ["zsh"]
     assert result.status == StepStatus.INSTALLED
 
 
@@ -128,7 +146,9 @@ def test_zsh_theme_bundled_does_not_brew_install(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     monkeypatch.setattr(shell_module.prompts, "text_input", lambda msg, **kw: "robbyrussell")
     installed = []
-    monkeypatch.setattr(BrewProvider, "install", lambda self, ctx, pkg, cask=False: installed.append(pkg))
+    monkeypatch.setattr(
+        BrewProvider, "install", lambda self, ctx, pkg, cask=False: installed.append(pkg)
+    )
 
     ConfigureZshThemeStep().run(make_context())
 

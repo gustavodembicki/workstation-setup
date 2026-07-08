@@ -29,8 +29,11 @@ class InstallZshStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
-        BrewProvider().install(ctx, "zsh")
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if reinstall:
+            BrewProvider().reinstall(ctx, "zsh")
+        else:
+            BrewProvider().install(ctx, "zsh")
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
@@ -47,9 +50,11 @@ class InstallOhMyZshStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
         # See InstallHomebrewStep.run for why this pipes rather than using
         # `bash -c "$(curl ...)"` (word-splitting gotcha with no outer shell).
+        # Re-running the installer with KEEP_ZSHRC=yes is a safe no-op-ish
+        # "reinstall"/"repair" action, so `reinstall` needs no special branch.
         ctx.run_command(
             ["/bin/bash", "-c", f"curl -fsSL {OH_MY_ZSH_INSTALL_URL} | bash"],
             env={**os.environ, "RUNZSH": "no", "CHSH": "no", "KEEP_ZSHRC": "yes"},
@@ -77,7 +82,10 @@ class ConfigureZshThemeStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        # This step is inherently "modify" on every call — it always
+        # re-prompts for a theme and reconciles ~/.zshrc, so `reinstall`
+        # doesn't need a separate branch.
         theme = prompts.text_input(
             "Which oh-my-zsh theme would you like?", default="powerlevel10k"
         )
@@ -131,7 +139,7 @@ class SetDefaultShellStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
         target = self._target_zsh_path(ctx)
         if SHELLS_FILE.exists() and target not in SHELLS_FILE.read_text():
             ctx.run_command(["sudo", "sh", "-c", f"echo {target} >> {SHELLS_FILE}"])

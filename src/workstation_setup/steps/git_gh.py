@@ -20,8 +20,11 @@ class InstallGitStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
-        BrewProvider().install(ctx, "git")
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if reinstall:
+            BrewProvider().reinstall(ctx, "git")
+        else:
+            BrewProvider().install(ctx, "git")
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
@@ -38,8 +41,11 @@ class InstallGhStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
-        BrewProvider().install(ctx, "gh")
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if reinstall:
+            BrewProvider().reinstall(ctx, "gh")
+        else:
+            BrewProvider().install(ctx, "gh")
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
@@ -61,9 +67,11 @@ class GhAuthLoginStep(Step):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
         # Genuinely interactive (opens a browser / shows a device code), so
         # stdout/stderr must attach to the real terminal, not be captured.
+        # Re-running is itself the "modify" action (re-authenticate), so
+        # `reinstall` needs no separate branch.
         ctx.run_command(["gh", "auth", "login"], capture=False)
         ctx.selections["gh_authenticated"] = True
         return StepResult(StepStatus.INSTALLED)

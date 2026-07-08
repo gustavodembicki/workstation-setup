@@ -18,22 +18,38 @@ Setting up a new developer machine after a fresh OS install is slow and manual: 
 
 ## High-level flow
 
+Nothing is mandatory. Every installable thing — Homebrew, zsh, the theme,
+asdf, git/gh, the SSH key, every IDE, every everyday app — is one entry in a
+single flat `MASTER_REGISTRY` (`cli.py`), and an `ALREADY_INSTALLED` result
+is never treated as "nothing to do": the user is always asked whether to
+reinstall/modify it, leave it alone, or cancel. See
+[02_steps_and_providers.md](02_steps_and_providers.md) for why that matters.
+
 ```
 1. cli.py: detect_os() → bail early with a friendly message if not linux/macos
 2. ensure_brew_on_path() — in case Homebrew is already installed from a prior run
 3. Build RunContext (real SubprocessRunner, real Console, loaded state.json)
-4. wizard.run(ctx, STEP_PIPELINE):
-     for each Step:
-       - is_applicable(ctx)?          skip entirely if not (e.g. SSH step needs gh)
-       - check_installed(ctx)          live detection — ALREADY_INSTALLED short-circuits
-       - [dry-run: print preview, continue]
-       - confirm with the user (unless --yes)
-       - run(ctx) — the real install action; StepError is caught, reported,
-         and the user is asked whether to keep going
-     print a summary table
-5. save_state(ctx.state)
+4. Ask once: "Run the recommended initial bootstrap first?" (Homebrew → zsh →
+   Oh My Zsh → theme → set default shell → asdf → asdf plugins → git → gh →
+   gh auth login → SSH key, in that order — RECOMMENDED_PIPELINE). This is a
+   convenience fast path, not a gate:
+     - yes → wizard.run_recommended(ctx, RECOMMENDED_PIPELINE) walks that
+       list in order. NOT_INSTALLED items get the usual confirm-then-run.
+       ALREADY_INSTALLED items get a Reinstall/Modify, Leave as is, or
+       Cancel prompt — never a silent skip.
+     - no  → straight to step 5.
+5. wizard.run_menu(ctx, MASTER_REGISTRY) — the big list of possibilities:
+   one checkbox menu with every entry (nothing pre-checked, whether or not
+   it's already installed), annotated "(already installed)" where that
+   applies. Whatever the user checks gets acted on: NOT_INSTALLED items run
+   directly (the checkbox is the confirmation), ALREADY_INSTALLED items get
+   the same Reinstall/Modify/Leave/Cancel prompt as step 4. This runs
+   regardless of what happened in step 4 — recommended items show up here
+   too, so nothing is ever only-offered-once.
+6. save_state(ctx.state)
 ```
 
-The pipeline itself (`STEP_PIPELINE` in `cli.py`) is currently:
-
-Homebrew → zsh → Oh My Zsh → Powerlevel10k → set default shell → asdf → asdf plugins → git → gh → gh auth login → SSH key → IDE selection → GUI app selection.
+`--yes` skips both prompts (no terminal session to answer them from). Paired
+with `--only <id>`, it runs just that item unattended; bare `--yes` with no
+`--only` does nothing but tells you so, rather than guessing a default
+selection for a menu no human looked at.

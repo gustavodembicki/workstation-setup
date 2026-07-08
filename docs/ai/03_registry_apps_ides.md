@@ -20,11 +20,11 @@ class AppSpec:
     windows: InstallMethod | None = None       # unused seam, see 01_architecture.md
 ```
 
-`registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 4 IDEs (JetBrains Toolbox, VS Code, Windsurf, Cursor). Same `AppSpec` shape — they're only split into two files because they show up on two separate checkbox screens (`steps/gui_apps.py` and `steps/ides.py`), not because the underlying model differs.
+`registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 4 IDEs (JetBrains Toolbox, VS Code, Windsurf, Cursor). Same `AppSpec` shape — they're only split into two files by convention (apps vs. IDEs), not because the underlying model differs. Both lists get wrapped into `AppSpecStep`s and flattened into `MASTER_REGISTRY` in `cli.py`, so an IDE and an everyday app show up side by side with Homebrew/zsh/etc. in the same menu — there's no separate "IDE screen" or "apps screen" anymore.
 
 ## How to add a new app or IDE
 
-Add one `AppSpec` entry to the relevant registry list. That's it — `steps/gui_apps.py`'s `run_selection_step()` and `install_app()` dispatcher are already generic over the registry. Do **not** add a new `if spec.id == "..."` branch anywhere; if you find yourself doing that, the app's specifics belong in its `InstallMethod`/`repo_setup` instead.
+Add one `AppSpec` entry to the relevant registry list. That's it — `steps/app_spec_step.py`'s `AppSpecStep` and `steps/gui_apps.py`'s `install_app()` dispatcher are already generic over any `AppSpec`. Do **not** add a new `if spec.id == "..."` branch anywhere; if you find yourself doing that, the app's specifics belong in its `InstallMethod`/`repo_setup` instead.
 
 ```python
 AppSpec(
@@ -49,16 +49,27 @@ Why some apps only have a `distro_family="debian"` entry and no generic fallback
 
 ## `install_app()` dispatch per `InstallMethod.kind`
 
-| kind | what happens |
-|------|--------------|
-| `brew_cask` / `brew_formula` | `get_brew_provider().install(ctx, identifier, cask=...)` |
-| `apt_repo` | run `repo_setup(ctx)` if present (adds gpg key + apt source), `apt-get update`, then `AptProvider().install(ctx, identifier)` |
-| `deb_download` | `curl -fsSL -o /tmp/...deb <identifier>`, then `sudo dpkg -i`, falling back to `sudo apt-get install -f -y` if dpkg reports broken deps |
-| `appimage` | download into `~/Applications/`, `chmod +x` |
-| `tarball` | download, `sudo tar -xzf ... -C /opt` |
-| `script` | `curl -fsSL <identifier> \| bash` (see the word-splitting gotcha in [02_steps_and_providers.md](02_steps_and_providers.md)) |
+`install_app(ctx, spec, *, reinstall=False)` and its inner `_execute_install_method` both take a `reinstall` flag — see [02_steps_and_providers.md](02_steps_and_providers.md) for when it's set.
 
-## Selection step behavior (`run_selection_step`, shared by both `steps/ides.py` and `steps/gui_apps.py`)
+| kind | what happens | with `reinstall=True` |
+|------|--------------|------------------------|
+| `brew_cask` / `brew_formula` | `get_brew_provider().install(ctx, identifier, cask=...)` | `get_brew_provider().reinstall(...)` (`brew reinstall`) |
+| `apt_repo` | run `repo_setup(ctx)` if present (adds gpg key + apt source), `apt-get update`, then `AptProvider().install(ctx, identifier)` | same steps again — re-running the repo setup + install is itself the reinstall |
+| `deb_download` | `curl -fsSL -o /tmp/...deb <identifier>`, then `sudo dpkg -i`, falling back to `sudo apt-get install -f -y` if dpkg reports broken deps | re-downloads and re-installs the same way |
+| `appimage` | download into `~/Applications/`, `chmod +x` | re-downloads over the existing file |
+| `tarball` | download, `sudo tar -xzf ... -C /opt` | re-downloads and re-extracts |
+| `script` | `curl -fsSL <identifier> \| bash` (see the word-splitting gotcha in [02_steps_and_providers.md](02_steps_and_providers.md)) | re-runs the same installer script |
 
-- Always offered (`check_installed` returns `NOT_INSTALLED` unconditionally) — re-running the wizard lets the user add things they skipped before. The checkbox pre-checks entries whose `check(ctx)` already returns `True`, so re-selecting an already-installed app is a harmless no-op, not a hard block.
-- One selected app failing to install does **not** abort the rest of the batch — failures are collected per-app and reported in the step's final `detail` string as `PARTIAL`, so picking 5 apps where 1 has a network hiccup still installs the other 4.
+Only `brew_cask`/`brew_formula` need a distinct code path for reinstall — everything else is naturally idempotent, so "reinstall" is just running the same method again.
+
+## `AppSpecStep` (`steps/app_spec_step.py`)
+
+Adapts one `AppSpec` into an ordinary `Step` so it can sit in `MASTER_REGISTRY` next to Homebrew/zsh/etc.:
+
+- `check_installed` → `spec.check(ctx)`
+- `run(ctx, *, reinstall=False)` → `install_app(ctx, spec, reinstall=reinstall)`
+- `dry_run_preview` → one line describing whichever `InstallMethod` would be used on the current OS/distro
+
+There's no more "always offered, re-running lets you add things you skipped before" special case — that used to live on `GuiAppsSelectionStep`/`IdeSelectionStep` because they were the only steps offered on every run regardless of status. Now *every* entry in `MASTER_REGISTRY` behaves that way (see [02_steps_and_providers.md](02_steps_and_providers.md)'s idempotency model), so `AppSpecStep` doesn't need to special-case it.
+
+`run_menu` (in `wizard.py`) is what used to be `run_selection_step` — one checkbox over every applicable `Step` (not just `AppSpec`s), nothing pre-checked, and a failure in one selected item doesn't abort the rest: failures are recorded per-item and the loop continues, so picking 5 things where 1 has a network hiccup still installs the other 4.

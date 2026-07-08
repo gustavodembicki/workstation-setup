@@ -27,6 +27,18 @@ def test_asdf_run_installs_via_brew(monkeypatch):
     assert result.status == StepStatus.INSTALLED
 
 
+def test_asdf_run_reinstall_uses_brew_reinstall(monkeypatch):
+    reinstalled = []
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: reinstalled.append(pkg)
+    )
+
+    result = InstallAsdfStep().run(make_context(), reinstall=True)
+
+    assert reinstalled == ["asdf"]
+    assert result.status == StepStatus.INSTALLED
+
+
 def test_plugins_step_only_applicable_when_asdf_installed(monkeypatch):
     monkeypatch.setattr(asdf_module, "command_exists", lambda name: False)
 

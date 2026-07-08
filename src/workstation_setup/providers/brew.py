@@ -75,6 +75,22 @@ class BrewProvider:
         args.append(package)
         ctx.run_command(args)
 
+    def reinstall(self, ctx: RunContext, package: str, *, cask: bool = False) -> None:
+        """Force a real reinstall — used when the user explicitly asks to
+        reinstall something `is_installed` already reports as present.
+        `brew install` on an already-installed package is a no-op, which
+        isn't what "reinstall" means to the user.
+        """
+        if cask and ctx.os_info.family != "macos":
+            raise UnsupportedPlatformError(
+                f"Homebrew casks are only supported on macOS (requested: {package})"
+            )
+        args = [self._brew(ctx), "reinstall"]
+        if cask:
+            args.append("--cask")
+        args.append(package)
+        ctx.run_command(args)
+
     def list_installed(self, ctx: RunContext) -> set[str]:
         result = ctx.run_command([self._brew(ctx), "list", "--versions"], check=False)
         return {line.split()[0] for line in result.stdout.splitlines() if line.strip()}

@@ -19,6 +19,18 @@ class StepStatus(StrEnum):
     FAILED = "failed"
 
 
+class ExistingAction(StrEnum):
+    """What the user wants to do about a Step that is already installed.
+
+    Surfaced whenever check_installed() returns ALREADY_INSTALLED — that
+    status must never cause a silent skip on its own (see wizard.py).
+    """
+
+    REINSTALL = "reinstall"
+    LEAVE = "leave"
+    CANCEL = "cancel"
+
+
 @dataclass
 class StepResult:
     status: StepStatus
@@ -51,9 +63,17 @@ class Step(ABC):
         """
 
     @abstractmethod
-    def run(self, ctx: RunContext) -> StepResult:
+    def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
         """Perform the actual install action. Must not swallow errors —
         let StepError propagate so the wizard can report it.
+
+        `reinstall=True` is passed when the user explicitly asked to
+        reinstall/modify something check_installed() already reported as
+        ALREADY_INSTALLED. Package-style steps (brew formulas/casks) should
+        force a real reinstall rather than a no-op install. Steps that are
+        already interactive/reconfigurable on every call (shell theme, SSH
+        key, gh auth, asdf plugins) can ignore the flag — re-running them is
+        already the "modify" action.
         """
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:

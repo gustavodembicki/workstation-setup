@@ -5,13 +5,11 @@ from factories import make_context, make_os_info
 from workstation_setup.exec import CommandResult, FakeRunner
 from workstation_setup.providers.brew import BrewProvider
 from workstation_setup.registry.models import AppSpec, InstallMethod
-from workstation_setup.steps import gui_apps as gui_apps_module
 from workstation_setup.steps.base import StepStatus
 from workstation_setup.steps.gui_apps import (
     _execute_install_method,
     _pick_linux_method,
     install_app,
-    run_selection_step,
 )
 
 
@@ -72,6 +70,35 @@ def test_execute_brew_cask(monkeypatch):
     _execute_install_method(ctx, InstallMethod("brew_cask", "google-chrome"))
 
     assert calls == [("google-chrome", True)]
+
+
+def test_execute_brew_cask_reinstall_uses_brew_reinstall(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: calls.append((pkg, cask))
+    )
+    monkeypatch.setattr(
+        BrewProvider, "install", lambda self, ctx, pkg, cask=False: (_ for _ in ()).throw(
+            AssertionError("should not install")
+        ),
+    )
+    ctx = make_context(os_info=make_os_info(family="macos", distro_family=None))
+
+    _execute_install_method(ctx, InstallMethod("brew_cask", "google-chrome"), reinstall=True)
+
+    assert calls == [("google-chrome", True)]
+
+
+def test_execute_brew_formula_reinstall_uses_brew_reinstall(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: calls.append(pkg)
+    )
+    ctx = make_context(os_info=make_os_info(family="macos", distro_family=None))
+
+    _execute_install_method(ctx, InstallMethod("brew_formula", "gcloud-sdk"), reinstall=True)
+
+    assert calls == ["gcloud-sdk"]
 
 
 def test_execute_apt_repo_runs_repo_setup_then_installs():
@@ -162,44 +189,14 @@ def test_install_app_unsupported_on_linux_when_no_method_matches():
     assert result.status == StepStatus.UNSUPPORTED
 
 
-def test_run_selection_step_no_selection_is_skipped(monkeypatch):
-    monkeypatch.setattr(gui_apps_module.prompts, "checkbox_select", lambda msg, choices: [])
-    ctx = make_context()
-
-    result = run_selection_step(ctx, "Everyday apps", [make_spec()])
-
-    assert result.status == StepStatus.SKIPPED_BY_USER
-
-
-def test_run_selection_step_installs_selected_and_reports_success(monkeypatch):
-    spec = make_spec(id="thing", display_name="Thing")
-    monkeypatch.setattr(gui_apps_module.prompts, "checkbox_select", lambda msg, choices: ["thing"])
+def test_install_app_passes_reinstall_through_to_brew(monkeypatch):
+    calls = []
     monkeypatch.setattr(
-        gui_apps_module,
-        "install_app",
-        lambda ctx, s: gui_apps_module.StepResult(StepStatus.INSTALLED),
+        BrewProvider, "reinstall", lambda self, ctx, pkg, cask=False: calls.append((pkg, cask))
     )
-    ctx = make_context()
+    spec = make_spec(macos=InstallMethod("brew_cask", "thing"))
+    ctx = make_context(os_info=make_os_info(family="macos", distro_family=None))
 
-    result = run_selection_step(ctx, "Everyday apps", [spec])
+    install_app(ctx, spec, reinstall=True)
 
-    assert result.status == StepStatus.INSTALLED
-    assert "Thing" in result.detail
-
-
-def test_run_selection_step_reports_partial_on_individual_failure(monkeypatch):
-    from workstation_setup.errors import StepError
-
-    spec = make_spec(id="thing", display_name="Thing")
-    monkeypatch.setattr(gui_apps_module.prompts, "checkbox_select", lambda msg, choices: ["thing"])
-
-    def fake_install(ctx, s):
-        raise StepError("network error", stderr="timeout")
-
-    monkeypatch.setattr(gui_apps_module, "install_app", fake_install)
-    ctx = make_context()
-
-    result = run_selection_step(ctx, "Everyday apps", [spec])
-
-    assert result.status == StepStatus.PARTIAL
-    assert "Thing" in result.detail
+    assert calls == [("thing", True)]
