@@ -1,0 +1,30 @@
+# Convenience wrapper around the three smoke-test Dockerfiles — one per
+# package-manager fallback path (apt/dnf/pacman). Not part of the automated
+# pytest suite; see tests/integration/README.md.
+#
+# Usage (from the repo root):
+#   docker compose -f tests/integration/docker/docker-compose.yml build
+#   docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu
+#   docker compose -f tests/integration/docker/docker-compose.yml run --rm fedora
+#   docker compose -f tests/integration/docker/docker-compose.yml run --rm arch
+services:
+  ubuntu:
+    build:
+      context: ../../..
+      dockerfile: tests/integration/docker/Dockerfile.ubuntu
+    stdin_open: true
+    tty: true
+
+  fedora:
+    build:
+      context: ../../..
+      dockerfile: tests/integration/docker/Dockerfile.fedora
+    stdin_open: true
+    tty: true
+
+  arch:
+    build:
+      context: ../../..
+      dockerfile: tests/integration/docker/Dockerfile.arch
+    stdin_open: true
+    tty: true

@@ -60,14 +60,14 @@ Run the wizard from source (no build needed):
 python -m workstation_setup --dry-run
 ```
 
-Manual, real-install verification (Docker for Linux, since real installers are too slow/mutating for the automated suite):
+Manual, real-install verification (Docker for Linux, since real installers are too slow/mutating for the automated suite — covers Ubuntu/Fedora/Arch to exercise the apt/dnf/pacman fallback paths):
 
 ```bash
-docker build -f tests/integration/docker/Dockerfile.ubuntu -t workstation-setup-smoketest .
-docker run -it --rm workstation-setup-smoketest
+docker compose -f tests/integration/docker/docker-compose.yml build
+docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu   # or fedora / arch
 ```
 
-See [tests/integration/README.md](tests/integration/README.md) for the full manual verification checklist, including macOS.
+See [tests/integration/README.md](tests/integration/README.md) for the full manual verification checklist, including macOS (Docker can't provide a real macOS kernel — needs a spare Mac or a local VM like UTM/Tart).
 
 ## Building the standalone binary
 
