@@ -22,18 +22,34 @@ class AppSpec:
 
 `registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 4 IDEs (JetBrains Toolbox, VS Code, Windsurf, Cursor). Same `AppSpec` shape — they're only split into two files by convention (apps vs. IDEs), not because the underlying model differs. Both lists get wrapped into `AppSpecStep`s and flattened into `MASTER_REGISTRY` in `cli.py`, so an IDE and an everyday app show up side by side with Homebrew/zsh/etc. in the same menu — there's no separate "IDE screen" or "apps screen" anymore.
 
+## The trustlist (`registry/trustlist.py`)
+
+Every external URL an `AppSpec` downloads or executes (GPG keys, apt repo lines, `.deb`/AppImage/tarball/script links) is centralized in `registry/trustlist.py` as `TRUSTLIST: dict[str, AppLinks]`, keyed by `AppSpec.id` — a single, auditable place to see exactly which external links this tool trusts, instead of hunting through `apps.py`/`ides.py` literals. `apps.py`/`ides.py` reference `TRUSTLIST["<id>"].download_url` (etc.) instead of inlining URLs. `trustlist.py` also exposes `apt_repo_setup(gpg_key_url, apt_repo_line, keyring_name)`, the shared builder for `InstallMethod(kind="apt_repo", repo_setup=...)` closures — used in place of the old per-app `_chrome_repo_setup`/`_spotify_repo_setup` functions. Adding a 3rd `apt_repo` app is a `TRUSTLIST` entry + one `apt_repo_setup(...)` call, not a new function.
+
 ## How to add a new app or IDE
 
-Add one `AppSpec` entry to the relevant registry list. That's it — `steps/app_spec_step.py`'s `AppSpecStep` and `steps/gui_apps.py`'s `install_app()` dispatcher are already generic over any `AppSpec`. Do **not** add a new `if spec.id == "..."` branch anywhere; if you find yourself doing that, the app's specifics belong in its `InstallMethod`/`repo_setup` instead.
+Add one `AppSpec` entry to the relevant registry list, plus its URL(s) in `TRUSTLIST` (`registry/trustlist.py`). That's it — `steps/app_spec_step.py`'s `AppSpecStep` and `steps/gui_apps.py`'s `install_app()` dispatcher are already generic over any `AppSpec`. Do **not** add a new `if spec.id == "..."` branch anywhere; if you find yourself doing that, the app's specifics belong in its `InstallMethod`/`repo_setup` instead.
 
 ```python
+# in trustlist.py:
+# "my_new_app": AppLinks(gpg_key_url=..., apt_repo_line=...),
+
 AppSpec(
     id="my_new_app",
     display_name="My New App",
     check=lambda ctx: command_exists("my-new-app"),
     macos=InstallMethod("brew_cask", "my-new-app"),
     linux=[
-        InstallMethod("apt_repo", "my-new-app", distro_family="debian", repo_setup=_my_repo_setup),
+        InstallMethod(
+            "apt_repo",
+            "my-new-app",
+            distro_family="debian",
+            repo_setup=apt_repo_setup(
+                TRUSTLIST["my_new_app"].gpg_key_url,
+                TRUSTLIST["my_new_app"].apt_repo_line,
+                "my-new-app",
+            ),
+        ),
         # optionally a distro_family=None generic fallback (script/appimage/tarball)
     ],
 )

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from workstation_setup.exec import command_exists
 from workstation_setup.registry.models import AppSpec, InstallMethod
+from workstation_setup.registry.trustlist import TRUSTLIST
 
 IDE_REGISTRY: list[AppSpec] = [
     AppSpec(
@@ -12,8 +13,7 @@ IDE_REGISTRY: list[AppSpec] = [
         linux=[
             InstallMethod(
                 "tarball",
-                "https://data.services.jetbrains.com/products/download?"
-                "code=TBA&platform=linux",
+                TRUSTLIST["jetbrains_toolbox"].download_url,
             ),
         ],
     ),
@@ -25,7 +25,7 @@ IDE_REGISTRY: list[AppSpec] = [
         linux=[
             InstallMethod(
                 "deb_download",
-                "https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64",
+                TRUSTLIST["vscode"].download_url,
                 distro_family="debian",
             ),
         ],
@@ -38,7 +38,7 @@ IDE_REGISTRY: list[AppSpec] = [
         linux=[
             InstallMethod(
                 "deb_download",
-                "https://windsurf-stable.codeiumdata.com/linux-x64/stable/latest/Windsurf.deb",
+                TRUSTLIST["windsurf"].download_url,
                 distro_family="debian",
             ),
         ],
@@ -49,7 +49,7 @@ IDE_REGISTRY: list[AppSpec] = [
         check=lambda ctx: command_exists("cursor"),
         macos=InstallMethod("brew_cask", "cursor"),
         linux=[
-            InstallMethod("appimage", "https://downloader.cursor.sh/linux/appImage/x64"),
+            InstallMethod("appimage", TRUSTLIST["cursor"].download_url),
         ],
     ),
 ]
