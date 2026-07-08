@@ -1,5 +1,3 @@
-from rich.console import Console
-
 from workstation_setup.context import RunContext
 from workstation_setup.exec import CommandResult, FakeRunner
 from workstation_setup.os_detect import OSInfo
@@ -21,7 +19,6 @@ def make_os_info(**overrides) -> OSInfo:
 def make_context(**overrides) -> RunContext:
     defaults = dict(
         os_info=make_os_info(),
-        console=Console(),
         runner=FakeRunner(default_result=CommandResult(0, "ok", "", [])),
         state=State(),
     )

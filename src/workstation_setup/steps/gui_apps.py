@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from workstation_setup import log
 from workstation_setup.errors import UnsupportedPlatformError
 from workstation_setup.providers.apt import AptProvider
 from workstation_setup.providers.registry import get_brew_provider
@@ -29,7 +30,7 @@ def _download(ctx: RunContext, url: str, dest: str) -> None:
     terminal (capture=False) instead of being silently buffered — a plain
     `-fsSL` capture makes a multi-hundred-MB download look like a hang.
     """
-    ctx.console.print(f"  [cyan]Downloading[/cyan] {url}")
+    log.note(f"Downloading {url}")
     ctx.run_command(["curl", "-fSL", "--progress-bar", "-o", dest, url], capture=False)
 
 
@@ -55,7 +56,7 @@ def _execute_install_method(
         AptProvider().install(ctx, method.identifier)
     elif method.kind == "deb_download":
         _download(ctx, method.identifier, DOWNLOAD_DEB_PATH)
-        ctx.console.print("  [cyan]Installing[/cyan] package (dpkg)")
+        log.note("Installing package (dpkg)")
         result = ctx.run_command(["sudo", "dpkg", "-i", DOWNLOAD_DEB_PATH], check=False)
         if not result.ok:
             ctx.run_command(["sudo", "apt-get", "install", "-f", "-y"])
@@ -67,7 +68,7 @@ def _execute_install_method(
         ctx.run_command(["chmod", "+x", dest])
     elif method.kind == "tarball":
         _download(ctx, method.identifier, DOWNLOAD_TARBALL_PATH)
-        ctx.console.print("  [cyan]Extracting[/cyan] archive to /opt")
+        log.note("Extracting archive to /opt")
         ctx.run_command(["sudo", "tar", "-xzf", DOWNLOAD_TARBALL_PATH, "-C", "/opt"])
     elif method.kind == "script":
         ctx.run_command(["bash", "-c", f"curl -fsSL {method.identifier} | bash"])

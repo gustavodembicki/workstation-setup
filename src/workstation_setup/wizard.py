@@ -4,16 +4,11 @@ from collections.abc import Callable
 
 import questionary
 
+from workstation_setup import log
 from workstation_setup.context import RunContext
 from workstation_setup.errors import AbortError, StepError
 from workstation_setup.steps.base import ExistingAction, Step, StepResult, StepStatus
 from workstation_setup.ui import prompts
-from workstation_setup.ui.console import (
-    print_failure,
-    print_result,
-    print_step_header,
-    print_summary_table,
-)
 
 ConfirmFn = Callable[[str], bool]
 ActionFn = Callable[[str], ExistingAction]
@@ -26,14 +21,15 @@ def _execute_step(ctx: RunContext, step: Step, *, reinstall: bool = False) -> St
     Shared by run_recommended and run_menu so both stay in sync on how a
     result is printed and persisted to state.json.
     """
-    console = ctx.console
     try:
-        result = step.run(ctx, reinstall=reinstall)
-        print_result(console, step, result)
+        with log.task(f"Running {step.title}..."):
+            result = step.run(ctx, reinstall=reinstall)
+        log.result(step, result)
         ctx.state.record(step.id, result.status.value, detail=result.detail)
         return result
     except StepError as error:
-        print_failure(console, step, error)
+        log.failure(step, error)
+        log.mark_failed()
         result = StepResult(StepStatus.FAILED, detail=str(error), error=error)
         ctx.state.record(step.id, result.status.value, detail=str(error))
         return result
@@ -46,14 +42,12 @@ def _resolve_already_installed(
     do" on its own. Ask the user for a real decision instead of silently
     skipping (that silent skip was the whole bug being fixed here).
     """
-    console = ctx.console
-
     if ctx.assume_yes:
         # No terminal to prompt in non-interactive/automation runs — the
         # safe default is to leave existing installs alone, same as the
         # pre-existing idempotent behavior.
         result = StepResult(StepStatus.ALREADY_INSTALLED, detail="left as is (--yes)")
-        print_result(console, step, result)
+        log.result(step, result)
         ctx.state.record(step.id, result.status.value, detail=result.detail)
         return result
 
@@ -63,7 +57,7 @@ def _resolve_already_installed(
 
     detail = "left as is by user" if action == ExistingAction.LEAVE else "cancelled by user"
     result = StepResult(StepStatus.SKIPPED_BY_USER, detail=detail)
-    print_result(console, step, result)
+    log.result(step, result)
     ctx.state.record(step.id, result.status.value, detail=detail)
     return result
 
@@ -80,19 +74,19 @@ def run_recommended(
     ALREADY_INSTALLED status is never a silent skip — see
     _resolve_already_installed.
     """
-    console = ctx.console
     results: Results = []
 
     for step in steps:
         if not step.is_applicable(ctx):
             continue
 
-        status = step.check_installed(ctx)
-        print_step_header(console, step)
+        with log.task(f"Checking {step.title}..."):
+            status = step.check_installed(ctx)
+        log.step_header(step)
 
         if ctx.dry_run:
             for line in step.dry_run_preview(ctx):
-                console.print(f"  {line}")
+                log.dry_run_line(line)
             results.append((step, StepResult(status, detail="dry-run preview")))
             continue
 
@@ -102,7 +96,7 @@ def run_recommended(
             proceed = ctx.assume_yes or confirm_fn(f"Proceed with: {step.title}?")
             if not proceed:
                 result = StepResult(StepStatus.SKIPPED_BY_USER)
-                print_result(console, step, result)
+                log.result(step, result)
                 ctx.state.record(step.id, result.status.value)
             else:
                 result = _execute_step(ctx, step)
@@ -112,10 +106,10 @@ def run_recommended(
         if result.status == StepStatus.FAILED:
             keep_going = ctx.assume_yes or confirm_fn("Continue with remaining steps?")
             if not keep_going:
-                print_summary_table(console, results)
+                log.summary_table(results)
                 raise AbortError(f"Aborted after failure in step '{step.id}'") from result.error
 
-    print_summary_table(console, results)
+    log.summary_table(results)
     return results
 
 
@@ -132,19 +126,21 @@ def run_menu(
     pre-checked -- the user opts into whatever they want this run, whether
     or not it's already installed.
     """
-    console = ctx.console
     applicable = [s for s in steps if s.is_applicable(ctx)]
-    statuses = {step.id: step.check_installed(ctx) for step in applicable}
+    statuses: dict[str, StepStatus] = {}
+    for step in applicable:
+        with log.task(f"Checking {step.title}..."):
+            statuses[step.id] = step.check_installed(ctx)
 
     if ctx.dry_run:
-        console.print("\n[bold]Everything available to install/reinstall/modify:[/bold]")
+        log.info("\n[bold]Everything available to install/reinstall/modify:[/bold]")
         results: Results = []
         for step in applicable:
             already = statuses[step.id] == StepStatus.ALREADY_INSTALLED
             note = " (already installed)" if already else ""
-            console.print(f"  - {step.title}{note}")
+            log.info(f"  - {step.title}{note}")
             for line in step.dry_run_preview(ctx):
-                console.print(f"      {line}")
+                log.dry_run_line(line, indent=6)
             results.append((step, StepResult(statuses[step.id], detail="dry-run preview")))
         return results
 
@@ -163,7 +159,7 @@ def run_menu(
         if step.id not in selected_ids:
             continue
 
-        print_step_header(console, step)
+        log.step_header(step)
         status = statuses[step.id]
         if status == StepStatus.ALREADY_INSTALLED:
             result = _resolve_already_installed(ctx, step, action_fn=action_fn)
@@ -171,5 +167,5 @@ def run_menu(
             result = _execute_step(ctx, step)
         results.append((step, result))
 
-    print_summary_table(console, results)
+    log.summary_table(results)
     return results

@@ -1,9 +1,18 @@
 from click.testing import CliRunner
 from factories import make_os_info
 
-from workstation_setup import cli
+from workstation_setup import cli, log
 from workstation_setup.state import State
 from workstation_setup.steps.base import Step, StepResult, StepStatus
+
+
+def _fake_configure(*, dry_run: bool = False) -> None:
+    # cli.main() always calls log.configure() first, which by default opens
+    # ~/.workstation-setup/run.log for real. Route it through log.reset()
+    # instead so CLI tests never touch the real filesystem (same rationale as
+    # mocking load_state/save_state below), while keeping a real,
+    # stdout-bound Console so CliRunner still captures printed output.
+    log.reset()
 
 
 class FakeStep(Step):
@@ -22,6 +31,7 @@ class FakeStep(Step):
 
 
 def _common_monkeypatches(monkeypatch, *, saved: list[State]):
+    monkeypatch.setattr(cli.log, "configure", _fake_configure)
     monkeypatch.setattr(cli, "detect_os", lambda: make_os_info(family="linux"))
     monkeypatch.setattr(cli, "load_state", lambda: State())
     monkeypatch.setattr(cli, "save_state", lambda state: saved.append(state))
@@ -37,6 +47,7 @@ def test_version_flag_prints_version():
 
 def test_main_exits_early_with_friendly_message_on_unsupported_platform(monkeypatch):
     windows_os_info = make_os_info(family="windows", distro_family=None)
+    monkeypatch.setattr(cli.log, "configure", _fake_configure)
     monkeypatch.setattr(cli, "detect_os", lambda: windows_os_info)
 
     result = CliRunner().invoke(cli.main)

@@ -37,6 +37,14 @@ runner = FakeRunner()
 runner.run = fake_run
 ```
 
+## Logging in tests: `log.reset()`, not dependency injection
+
+`workstation_setup.log` is a module-level singleton (see [01_architecture.md](01_architecture.md)), not a `RunContext` field, so it isn't faked by passing something into `make_context()`. Isolation instead comes from an autouse fixture in `tests/unit/conftest.py` that calls `log.reset()` before and after every test — this swaps in a fresh `Console(record=True)` and clears any file/failure state, so tests never see another test's output and never touch `~/.workstation-setup/run.log`. You don't need to do anything extra in most tests; it's automatic.
+
+The one place this bites: **`cli.main()` itself calls `log.configure()`**, which by default opens the real `~/.workstation-setup/run.log`. `tests/unit/test_cli.py` monkeypatches `cli.log.configure` to call `log.reset()` instead (see `_fake_configure`) so `CliRunner().invoke(cli.main, ...)` never writes to the real filesystem — apply the same pattern if you add new tests that invoke `cli.main` directly.
+
+If a test needs to assert on printed content, use `log.console_export()` (requires `record=True`, which is what `reset()` sets up).
+
 ## Monkeypatching rules that matter
 
 - **Patch the module attribute, not the imported name.** If `steps/asdf.py` does `from workstation_setup.exec import command_exists`, you must patch `workstation_setup.steps.asdf.command_exists` (imported into asdf.py's own namespace) — patching `workstation_setup.exec.command_exists` has no effect, because `asdf.py` already holds its own reference. Same applies to `prompts.confirm_step` etc. — steps call `prompts.checkbox_select(...)` (attribute access on the imported module), so patching `some_step_module.prompts.checkbox_select` works correctly.

@@ -1,9 +1,8 @@
 import sys
 
 import click
-from rich.console import Console
 
-from workstation_setup import __version__, wizard
+from workstation_setup import __version__, log, wizard
 from workstation_setup.context import RunContext
 from workstation_setup.errors import AbortError
 from workstation_setup.exec import SubprocessRunner
@@ -25,7 +24,6 @@ from workstation_setup.steps.shell import (
 )
 from workstation_setup.steps.ssh import GenerateSshKeyStep
 from workstation_setup.ui import prompts
-from workstation_setup.ui.console import print_welcome
 
 # The recommended initial bootstrap, in the order it's made sense to run in
 # since v1: Homebrew before anything that installs via it, gh before the SSH
@@ -73,67 +71,75 @@ def _filter_steps(steps: list[Step], *, only: tuple[str, ...], skip: tuple[str, 
 @click.version_option(version=__version__, prog_name="workstation-setup")
 def main(dry_run: bool, assume_yes: bool, only: tuple[str, ...], skip: tuple[str, ...]) -> None:
     """Bootstrap a fresh developer workstation."""
-    console = Console()
-    os_info = detect_os()
-
-    if os_info.family not in ("linux", "macos"):
-        console.print(
-            f"[red]workstation-setup does not support {os_info.family} yet "
-            "- only Linux and macOS are supported.[/red]"
-        )
-        sys.exit(1)
-
-    # Covers the case where Homebrew was already installed in a previous run —
-    # its bin dir may still be missing from this process's PATH.
-    ensure_brew_on_path(os_info)
-
-    state = load_state()
-
-    recommended_steps = _filter_steps(RECOMMENDED_PIPELINE, only=only, skip=skip)
-    menu_steps = _filter_steps(MASTER_REGISTRY, only=only, skip=skip)
-
-    ctx = RunContext(
-        os_info=os_info,
-        console=console,
-        runner=SubprocessRunner(),
-        state=state,
-        dry_run=dry_run,
-        assume_yes=assume_yes,
-    )
-
-    print_welcome(console, f"{ctx.os_info.family} ({ctx.os_info.distro_name or ''})")
-
+    log.configure(dry_run=dry_run)
     try:
-        if assume_yes:
-            if only:
-                # Targeted, unattended automation: run just the requested
-                # id(s) directly. run_recommended never blocks on a prompt
-                # when ctx.assume_yes is set (an already-installed match is
-                # left as is, same as historical --yes behavior).
-                wizard.run_recommended(ctx, menu_steps)
-            else:
-                console.print(
-                    "[yellow]--yes with no --only given: nothing to run — the big "
-                    "menu of possibilities has no interactive session to pick from. "
-                    "Pass --only <id> to run something specific unattended.[/yellow]"
-                )
-        else:
-            run_bootstrap = bool(recommended_steps) and prompts.confirm_step(
-                "Run the recommended initial bootstrap first? "
-                "(Homebrew, zsh + Oh My Zsh + theme, default shell, asdf + plugins, "
-                "git, GitHub CLI + auth, SSH key)",
-                default=True,
+        os_info = detect_os()
+
+        if os_info.family not in ("linux", "macos"):
+            log.error(
+                f"workstation-setup does not support {os_info.family} yet "
+                "- only Linux and macOS are supported."
             )
-            if run_bootstrap:
-                wizard.run_recommended(ctx, recommended_steps)
+            log.mark_failed()
+            sys.exit(1)
 
-            wizard.run_menu(ctx, menu_steps)
-    except AbortError as error:
-        console.print(f"[red]{error}[/red]")
+        # Covers the case where Homebrew was already installed in a previous run —
+        # its bin dir may still be missing from this process's PATH.
+        ensure_brew_on_path(os_info)
+
+        state = load_state()
+
+        recommended_steps = _filter_steps(RECOMMENDED_PIPELINE, only=only, skip=skip)
+        menu_steps = _filter_steps(MASTER_REGISTRY, only=only, skip=skip)
+
+        ctx = RunContext(
+            os_info=os_info,
+            runner=SubprocessRunner(),
+            state=state,
+            dry_run=dry_run,
+            assume_yes=assume_yes,
+        )
+
+        log.welcome(f"{ctx.os_info.family} ({ctx.os_info.distro_name or ''})")
+
+        try:
+            if assume_yes:
+                if only:
+                    # Targeted, unattended automation: run just the requested
+                    # id(s) directly. run_recommended never blocks on a prompt
+                    # when ctx.assume_yes is set (an already-installed match is
+                    # left as is, same as historical --yes behavior).
+                    wizard.run_recommended(ctx, menu_steps)
+                else:
+                    log.warning(
+                        "--yes with no --only given: nothing to run — the big "
+                        "menu of possibilities has no interactive session to pick from. "
+                        "Pass --only <id> to run something specific unattended."
+                    )
+            else:
+                run_bootstrap = bool(recommended_steps) and prompts.confirm_step(
+                    "Run the recommended initial bootstrap first? "
+                    "(Homebrew, zsh + Oh My Zsh + theme, default shell, asdf + plugins, "
+                    "git, GitHub CLI + auth, SSH key)",
+                    default=True,
+                )
+                if run_bootstrap:
+                    wizard.run_recommended(ctx, recommended_steps)
+
+                wizard.run_menu(ctx, menu_steps)
+        except AbortError as error:
+            log.error(str(error))
+            log.mark_failed()
+            save_state(ctx.state)
+            log.finalize(success=False)
+            sys.exit(1)
+
         save_state(ctx.state)
-        sys.exit(1)
-
-    save_state(ctx.state)
+        log.finalize(success=True)
+    except BaseException:
+        log.mark_failed()
+        log.finalize(success=False)
+        raise
 
 
 if __name__ == "__main__":

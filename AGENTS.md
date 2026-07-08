@@ -22,14 +22,20 @@ context.py          — RunContext: os_info, console, runner, dry_run, assume_ye
 os_detect.py         — detect_os() -> OSInfo(family, distro_family, arch, ...)
 exec.py               — the ONLY place subprocess is called from (Runner/FakeRunner, dry-run, StepError)
 state.py               — ~/.workstation-setup/state.json — an audit log only, NEVER the source of truth
+log.py                  — the ONLY place output/logging happens: a module-level singleton (import and call
+                          `log.info(...)`/`log.task(...)`/etc. from anywhere, no wiring through RunContext
+                          needed). Also owns ~/.workstation-setup/run.log — written during the run, deleted
+                          on clean success, kept (and its path reported) whenever a run fails or is aborted.
 
 providers/               — PackageProvider abstraction: brew (primary, both OSes; install + reinstall), apt/dnf/pacman (Linux fallback)
 steps/                    — one Step per installable unit (homebrew, shell, asdf, git_gh, ssh, gui_apps dispatcher, app_spec_step adapter)
 registry/                  — data-driven AppSpec list for GUI apps + IDEs (the extensibility seam)
-ui/                         — thin, mockable wrappers around questionary (prompts.py, incl. select_existing_action) and rich (console.py)
+ui/                         — thin, mockable wrapper around questionary (prompts.py, incl. select_existing_action)
 ```
 
 **Rule:** Steps never call `subprocess` directly — always through `ctx.run_command(...)`, which itself always goes through `exec.run_command`. This is what makes every Step unit-testable with a `FakeRunner` and makes `--dry-run` work for free.
+
+**Rule:** Steps never print/log directly through `rich`/`print()` — always through `workstation_setup.log` (e.g. `log.info(...)`, `log.note(...)`, `log.task(...)` as a spinner context manager around a blocking call). It's a plain module-level singleton, so a new Step needs zero constructor wiring to use it — just `from workstation_setup import log`. `log.task(...)`/`ctx.run_command(..., capture=False)` already coordinate automatically (the spinner suspends itself around any uncaptured, potentially-interactive subprocess) — never wrap an individual `capture=False` call in `log.task(...)` yourself.
 
 ## Mandatory rules
 

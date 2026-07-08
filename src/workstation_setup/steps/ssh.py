@@ -5,8 +5,7 @@ import socket
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from rich.panel import Panel
-
+from workstation_setup import log
 from workstation_setup.exec import command_exists
 from workstation_setup.steps.base import Step, StepResult, StepStatus
 from workstation_setup.ui import prompts
@@ -73,11 +72,9 @@ class GenerateSshKeyStep(Step):
         if ctx.selections.get("gh_authenticated"):
             return self._offer_github_upload(ctx, pub)
 
-        ctx.console.print(
-            Panel(
-                pub.read_text(),
-                title=f"Public key — add it manually at {GITHUB_SSH_SETTINGS_URL}",
-            )
+        log.panel(
+            pub.read_text(),
+            title=f"Public key — add it manually at {GITHUB_SSH_SETTINGS_URL}",
         )
         return StepResult(StepStatus.INSTALLED, detail="key generated")
 

@@ -19,10 +19,11 @@
 ┌──▼───┐    ┌─────▼─────┐  ┌─────▼──────┐  ┌────▼─────┐
 │steps/│    │providers/  │  │registry/   │  │ui/       │
 │one   │───▶│PackageProv-│  │AppSpec /   │  │prompts.py│
-│Step  │    │ider: brew, │  │InstallMeth-│  │console.py│
-│class │    │apt/dnf/    │  │od (data-   │  │(thin,    │
-│per   │    │pacman      │  │driven app/ │  │mockable  │
-│unit  │    │            │  │IDE list)   │  │wrappers) │
+│Step  │    │ider: brew, │  │InstallMeth-│  │(thin,    │
+│class │    │apt/dnf/    │  │od (data-   │  │mockable  │
+│per   │    │pacman      │  │driven app/ │  │wrapper   │
+│unit  │    │            │  │IDE list)   │  │around    │
+│      │    │            │  │            │  │questionary)│
 └──┬───┘    └─────┬──────┘  └────────────┘  └──────────┘
    │              │
    └──────┬───────┘
@@ -32,9 +33,17 @@
    │ Runner/       │  (SubprocessRunner in prod, FakeRunner in tests)
    │ FakeRunner    │
    └───────────────┘
+
+   Every layer above also reaches log.py directly — a module-level
+   singleton, imported wherever needed, not passed through RunContext:
+   log.info/warning/error/note/panel/result/... for all output, log.task(...)
+   as an indeterminate spinner around a blocking call. ctx.run_command
+   auto-suspends the active spinner whenever capture=False.
 ```
 
 **Rule:** `wizard.py` never knows about brew/apt/curl/etc. — it only knows the `Step` interface. `steps/*.py` never call `subprocess` directly — only `ctx.run_command`. This is what keeps every layer independently testable.
+
+**Rule:** Nothing prints/logs directly — always through `log.py` (`workstation_setup.log`). Unlike `ctx.runner` (still injected via `RunContext` for `FakeRunner` swapping in tests), logging is a plain module import, not a `RunContext` field — a brand-new Step/Provider gets logging (and the spinner) for free with zero constructor wiring. Tests get isolation via `log.reset()` (an autouse fixture in `tests/unit/conftest.py`), not dependency injection.
 
 ## File tree (key paths only)
 
@@ -46,7 +55,11 @@ src/workstation_setup/
 ├── context.py                  # RunContext dataclass
 ├── os_detect.py                 # detect_os() -> OSInfo
 ├── exec.py                       # run_command/command_exists, Runner/FakeRunner, StepError
-├── state.py                       # ~/.workstation-setup/state.json (cache/log, not source of truth)
+├── state.py                       # ~/.workstation-setup/state.json (audit trail, not source of truth)
+├── log.py                          # the ONLY place output/logging happens — module-level singleton,
+│                                    # import from anywhere (log.info/task/etc.), no RunContext wiring.
+│                                    # Also owns ~/.workstation-setup/run.log: written during the run,
+│                                    # deleted on clean success, kept on failure/abort.
 ├── errors.py                       # StepError, AbortError, UnsupportedPlatformError
 │
 ├── providers/
@@ -71,8 +84,7 @@ src/workstation_setup/
 │   └── ides.py                   # JetBrains Toolbox, VS Code, Windsurf, Cursor
 │
 └── ui/
-    ├── prompts.py              # confirm_step / checkbox_select / text_input / select_existing_action
-    └── console.py               # print_welcome / print_result / print_summary_table (rich wrappers)
+    └── prompts.py              # confirm_step / checkbox_select / text_input / select_existing_action
 
 tests/
 ├── unit/                   # pytest — FakeRunner, no real subprocess calls, mirrors src structure
