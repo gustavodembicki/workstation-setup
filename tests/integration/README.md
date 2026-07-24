@@ -59,6 +59,27 @@ python -m workstation_setup --only homebrew         # really install just Homebr
 python -m workstation_setup                         # real run, full interactive menu — safe, container is thrown away after
 ```
 
+For a useful release smoke test, do the following in one fresh container:
+
+1. Run the full `--dry-run`, accept the initial recommended-bootstrap prompt,
+   and confirm that it previews every available step without changing the
+   container or asking menu questions.
+2. Run `--only homebrew` for the real Homebrew bootstrap.  Then run the full
+   wizard and choose one app or IDE appropriate to the distro.  Watch that
+   download URLs are sensible and that `curl` shows its progress bar in the
+   terminal rather than returning only after a hidden download.
+3. Where a step prompts for authentication (for example GitHub CLI), confirm
+   that the prompt is attached to the terminal.  Do not automate credentials
+   into this disposable test.
+4. After deliberately cancelling a step or observing a command failure,
+   inspect the reported `~/.workstation-setup/run.log`; it must remain present.
+   Start a new successful run and verify that the file is removed at the end.
+
+Ubuntu is the best first pass for APT repositories and `.deb` downloads.
+Repeat the menu flow in Fedora and Arch for compatible `dnf` and `pacman`
+fallbacks.  Script, tarball, and AppImage methods can be exercised on any of
+the images.
+
 Exit the container (`exit` or Ctrl-D) and `docker compose run` tears it down
 automatically (`--rm`); nothing persists between runs.
 
