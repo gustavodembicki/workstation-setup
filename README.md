@@ -1,102 +1,109 @@
 # workstation-setup
 
-An interactive wizard that bootstraps a fresh Linux or macOS developer workstation. Format the laptop, download one file, run it, and get a working dev environment — no manual copy-pasting of install commands, no forgetting a step.
+`workstation-setup` is an interactive terminal wizard for bootstrapping a new
+developer machine on Linux or macOS. It packages the setup workflow into one
+native executable: choose the tools you want, review each action, and let the
+wizard run the supported installation path.
 
-Ships as a **single self-contained executable per OS** (built with PyInstaller) — no Python installation required on the target machine.
+Windows is deliberately unsupported in v1. The program detects it and exits
+without changing the machine.
 
-## What it sets up
+## What it can configure
 
-Each step is optional and skippable — the wizard asks before doing anything, and re-running it is always safe (already-installed things are detected and skipped automatically):
+Nothing is mandatory. The menu contains individual, opt-in entries for:
 
-- **Homebrew** — the primary package manager on both macOS and Linux (Linuxbrew)
-- **zsh** + **Oh My Zsh** + **Powerlevel10k** theme, with an explicit confirmation before changing your login shell
-- **asdf** version manager, with a curated plugin picker (Node, Python, Erlang, Elixir, Ruby, Go) plus free-text entry for anything else in asdf's plugin registry
-- **git** + **GitHub CLI (`gh`)**, with an interactive `gh auth login`
-- **SSH key generation** (ed25519) — offered only once `gh` is around, never overwrites an existing key without an explicit confirmation, and offers to upload the public key to GitHub automatically via `gh ssh-key add` when authenticated
-- **IDEs** (pick any combination): JetBrains Toolbox, VS Code, Windsurf, Cursor
-- **Everyday apps** (pick any combination): Google Chrome, Slack, Spotify, Google Cloud SDK, Devin Desktop
+- Homebrew (including Linuxbrew), zsh, Oh My Zsh, Powerlevel10k, and the login shell
+- asdf and selected language plugins
+- Git, GitHub CLI, GitHub authentication, and an ed25519 SSH key
+- IDEs: JetBrains Toolbox, VS Code, Windsurf, and Cursor
+- Apps: Google Chrome, Slack, Spotify, Google Cloud SDK, and Devin Desktop
 
-**Scope:** Linux and macOS only. Windows isn't supported in v1 — the CLI detects this and exits with a clear message rather than doing anything unsafe.
+Install support depends on the operating system and Linux distribution. The
+wizard clearly reports an unsupported selection instead of pretending it was
+installed.
 
 ## Quick start
 
-Download the appropriate binary from the [latest release](../../releases/latest) and run it:
+Download the binary for your operating system from the
+[latest release](../../releases/latest), make it executable, and start it in a
+real terminal:
 
 ```bash
-chmod +x workstation-setup-linux-x86_64   # or workstation-setup-macos-arm64
+chmod +x workstation-setup-linux-x86_64 # or workstation-setup-macos-arm64
 ./workstation-setup-linux-x86_64
 ```
 
-Useful flags:
+The wizard first offers the recommended bootstrap (Homebrew through SSH), then
+always shows the complete flat menu. You may skip either path and choose only
+the tools you need.
+
+Useful commands:
 
 ```bash
-./workstation-setup --dry-run              # preview every step, install nothing
-./workstation-setup --yes                  # accept every prompt (non-interactive)
-./workstation-setup --only homebrew --only zsh   # run just specific steps (repeatable flag)
-./workstation-setup --skip gui-apps        # run everything except specific steps
+./workstation-setup --dry-run
+./workstation-setup --dry-run --only homebrew
+./workstation-setup --yes --only homebrew --only git
+./workstation-setup --skip gcloud_sdk
 ./workstation-setup --version
 ```
 
-## How it works
+`--yes` is intended for targeted automation and should be paired with one or
+more `--only` values. With no `--only`, it safely runs nothing because no
+interactive user was able to choose menu entries.
 
-Under the hood, a `Step` interface (check → confirm → run) drives an ordered pipeline — Homebrew, shell, asdf, git/gh, SSH, then IDE/app selection — each backed by a `PackageProvider` abstraction (Homebrew primarily, apt/dnf/pacman as the Linux fallback for GUI apps without a Homebrew cask). Apps and IDEs are data-driven entries in a registry, not hardcoded branches, so adding a new one is a single new entry.
+For the complete walkthrough, prerequisites, recovery information, and the
+behavior of re-runs, see [the usage guide](docs/usage.md). See
+[the CLI reference](docs/cli-reference.md) for every option and valid step ID.
 
-See [AGENTS.md](AGENTS.md) and [docs/ai/](docs/ai/README.md) for the full architecture writeup, including two real bugs the design had to work around (a `bash -c "$(curl ...)"` word-splitting gotcha, and Homebrew's bin directory not being on `PATH` mid-process).
+## Safety model
 
-## Development
+The project only offers applications and installation routes that are defined
+in its source registry. External app/IDE download URLs and apt repository
+metadata are centralized in a reviewable trustlist rather than accepted from
+terminal input.
+It also asks before changing the login shell or overwriting an existing SSH
+key, and attaches interactive GitHub authentication to your terminal.
+
+This is a curated installer, not a complete supply-chain verification system:
+the project does not currently verify downloaded artifacts with project-managed
+checksums or signatures. Review the full boundary, permissions, and limitations
+before running it in a sensitive environment: [security documentation](docs/security.md).
+
+## Develop from source
+
+Python 3.11+ is required for development, not for running a release binary.
 
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-pytest tests/unit    # unit suite — fast, no real subprocess calls
-ruff check .          # lint
-```
-
-Run the wizard from source (no build needed):
-
-```bash
+pytest tests/unit
+ruff check .
 python -m workstation_setup --dry-run
 ```
 
-Manual, real-install verification (Docker for Linux, since real installers are too slow/mutating for the automated suite — covers Ubuntu/Fedora/Arch to exercise the apt/dnf/pacman fallback paths):
-
-```bash
-docker compose -f tests/integration/docker/docker-compose.yml build
-docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu   # or fedora / arch
-```
-
-See [tests/integration/README.md](tests/integration/README.md) for the full manual verification checklist, including macOS (Docker can't provide a real macOS kernel — needs a spare Mac or a local VM like UTM/Tart).
-
-## Building the standalone binary
+Build a native binary on the target operating system:
 
 ```bash
 pyinstaller packaging/pyinstaller.spec
 ```
 
-PyInstaller does not cross-compile: build on Linux for the Linux binary, on macOS for the macOS binary. CI does this via a build matrix — see [`.github/workflows/release.yml`](.github/workflows/release.yml).
+PyInstaller does not cross-compile. Linux and macOS artifacts must be built on
+their respective platforms.
 
-## Project structure
+## Documentation
 
-```
-src/workstation_setup/
-├── cli.py, wizard.py, context.py   # entry point + orchestration
-├── os_detect.py, exec.py, state.py, errors.py   # foundation
-├── providers/    # brew / apt / dnf / pacman
-├── steps/        # one Step per installable unit
-├── registry/     # data-driven app/IDE list
-└── ui/           # thin questionary/rich wrappers
-
-tests/
-├── unit/         # pytest, FakeRunner — no real subprocess calls
-└── integration/  # manual/Docker verification (not run by pytest)
-```
+- [Usage guide](docs/usage.md) — run the wizard safely and recover from failures
+- [CLI reference](docs/cli-reference.md) — options, examples, and step IDs
+- [Security model](docs/security.md) — curated registry, trust boundaries, and limitations
+- [Integration verification](tests/integration/README.md) — disposable Linux and macOS checks
+- [AI Knowledge](docs/ai/README.md) — architecture and safe extension guidance
 
 ## Contributing
 
-Every new `Step` needs a unit test using the `FakeRunner`/`make_context` pattern in `tests/unit/factories.py` — see [docs/ai/04_testing.md](docs/ai/04_testing.md). Adding a new GUI app or IDE is a single registry entry, not new dispatch code — see [docs/ai/03_registry_apps_ides.md](docs/ai/03_registry_apps_ides.md).
-
-## Windows
-
-Out of scope for v1. The architecture (`OSInfo.family`, `AppSpec.windows`) leaves room for a future Windows provider without a rewrite — see [docs/ai/01_architecture.md](docs/ai/01_architecture.md#future-windows-seam).
+The core design is `Step` + provider + registry: a new application or IDE is
+normally one registry entry, while a new category is a new `Step`. Every new
+step needs a `FakeRunner`-based unit test; never call subprocesses directly
+from a step. Read [the AI Knowledge index](docs/ai/README.md) before changing
+installation behavior, providers, trust boundaries, packaging, or CI.

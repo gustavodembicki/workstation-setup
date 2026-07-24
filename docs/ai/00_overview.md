@@ -53,3 +53,12 @@ reinstall/modify it, leave it alone, or cancel. See
 with `--only <id>`, it runs just that item unattended; bare `--yes` with no
 `--only` does nothing but tells you so, rather than guessing a default
 selection for a menu no human looked at.
+
+## Documentation boundaries
+
+The top-level [README](../../README.md) and [usage guide](../usage.md) explain
+how an end user runs the wizard. Keep implementation details, extension rules,
+and architectural invariants in this `docs/ai/` layer instead. Security facts
+that affect a user's decision—curated registries, privileged commands, and the
+absence of project-managed artifact verification—belong in
+[security.md](../security.md) as well as the relevant implementation document.
