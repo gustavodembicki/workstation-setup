@@ -1,8 +1,7 @@
-from workstation_setup.registry.apps import APP_REGISTRY
-from workstation_setup.registry.ides import IDE_REGISTRY
+from workstation_setup.registry.catalog import all_specs
 from workstation_setup.registry.trustlist import TRUSTLIST
 
-ALL_SPECS = [*APP_REGISTRY, *IDE_REGISTRY]
+ALL_SPECS = list(all_specs())
 ALL_IDS = {spec.id for spec in ALL_SPECS}
 
 
@@ -36,7 +35,7 @@ def test_all_links_are_well_formed_urls():
             if field_name == "apt_repo_line":
                 # Not a bare URL - a `deb [...] <url> <suite> <component>` line -
                 # just make sure the embedded repo URL uses a real scheme.
-                assert " http://" in value or " https://" in value, f"{app_id}: {value!r}"
+                assert " https://" in value, f"{app_id}: {value!r}"
             else:
-                is_url = value.startswith("http://") or value.startswith("https://")
+                is_url = value.startswith("https://")
                 assert is_url, f"{app_id}.{field_name}: {value!r}"

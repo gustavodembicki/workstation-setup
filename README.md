@@ -15,7 +15,7 @@ Nothing is mandatory. The menu contains individual, opt-in entries for:
 - Homebrew (including Linuxbrew), zsh, Oh My Zsh, Powerlevel10k, and the login shell
 - asdf and selected language plugins
 - Git, GitHub CLI, GitHub authentication, and an ed25519 SSH key
-- IDEs: JetBrains Toolbox, VS Code, Windsurf, and Cursor
+- IDEs: JetBrains Toolbox, VS Code, and Cursor
 - Apps: Google Chrome, Slack, Spotify, Google Cloud SDK, and Devin Desktop
 
 Install support depends on the operating system and Linux distribution. The
@@ -91,6 +91,33 @@ pyinstaller packaging/pyinstaller.spec
 
 PyInstaller does not cross-compile. Linux and macOS artifacts must be built on
 their respective platforms.
+
+## Test real installs in Docker (Linux)
+
+Unit tests do not invoke real installers. To smoke-test the wizard and its
+side-effecting steps in a disposable Ubuntu container:
+
+```bash
+make build
+make run
+```
+
+`make run` opens a new, automatically removed container. Inside it:
+
+```bash
+source .venv/bin/activate
+python -m workstation_setup --dry-run
+python -m workstation_setup --only homebrew
+```
+
+After finishing, `make down` removes any compose-managed containers and
+networks. `make rebuild` first cleans compose state and then rebuilds the image
+without cache, which is useful when validating a fully fresh environment after
+source or Dockerfile changes. Use `DISTRO=fedora` or `DISTRO=arch` with any
+target to exercise the `dnf` or `pacman` package-manager paths, for example
+`make rebuild DISTRO=fedora`. Docker cannot validate macOS behavior; use a
+spare Mac, VM, or scratch user account for that. See [the integration-test guide](tests/integration/README.md)
+for the full release smoke-test checklist.
 
 ## Documentation
 

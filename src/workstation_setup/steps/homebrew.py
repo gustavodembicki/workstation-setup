@@ -37,6 +37,11 @@ class InstallHomebrewStep(Step):
         ctx.run_command(
             ["/bin/bash", "-c", f"curl -fsSL {INSTALL_SCRIPT_URL} | bash"],
             env={**os.environ, "NONINTERACTIVE": "1"},
+            # Homebrew prints its platform-specific "Next steps" (including
+            # the shellenv command) after installation. Stream it instead of
+            # capturing and discarding it, so the user can apply the durable
+            # PATH setup in their own shell after this process exits.
+            capture=False,
         )
         ensure_brew_on_path(ctx.os_info)
         return StepResult(StepStatus.INSTALLED)

@@ -31,19 +31,6 @@ IDE_REGISTRY: list[AppSpec] = [
         ],
     ),
     AppSpec(
-        id="windsurf",
-        display_name="Windsurf",
-        check=lambda ctx: command_exists("windsurf"),
-        macos=InstallMethod("brew_cask", "windsurf"),
-        linux=[
-            InstallMethod(
-                "deb_download",
-                TRUSTLIST["windsurf"].download_url,
-                distro_family="debian",
-            ),
-        ],
-    ),
-    AppSpec(
         id="cursor",
         display_name="Cursor",
         check=lambda ctx: command_exists("cursor"),

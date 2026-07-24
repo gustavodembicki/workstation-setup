@@ -52,26 +52,30 @@ def _execute_install_method(
         # + apt-get install is safe and is itself the "reinstall" action.
         if method.repo_setup:
             method.repo_setup(ctx)
-        ctx.run_command(["sudo", "apt-get", "update"])
+        ctx.run_command(["sudo", "apt-get", "update"], capture=False)
         AptProvider().install(ctx, method.identifier)
     elif method.kind == "deb_download":
         _download(ctx, method.identifier, DOWNLOAD_DEB_PATH)
         log.note("Installing package (dpkg)")
-        result = ctx.run_command(["sudo", "dpkg", "-i", DOWNLOAD_DEB_PATH], check=False)
+        result = ctx.run_command(
+            ["sudo", "dpkg", "-i", DOWNLOAD_DEB_PATH], check=False, capture=False
+        )
         if not result.ok:
-            ctx.run_command(["sudo", "apt-get", "install", "-f", "-y"])
+            ctx.run_command(["sudo", "apt-get", "install", "-f", "-y"], capture=False)
     elif method.kind == "appimage":
         dest_dir = Path.home() / "Applications"
-        ctx.run_command(["mkdir", "-p", str(dest_dir)])
+        ctx.run_command(["mkdir", "-p", str(dest_dir)], capture=False)
         dest = str(dest_dir / Path(method.identifier).name)
         _download(ctx, method.identifier, dest)
-        ctx.run_command(["chmod", "+x", dest])
+        ctx.run_command(["chmod", "+x", dest], capture=False)
     elif method.kind == "tarball":
         _download(ctx, method.identifier, DOWNLOAD_TARBALL_PATH)
         log.note("Extracting archive to /opt")
-        ctx.run_command(["sudo", "tar", "-xzf", DOWNLOAD_TARBALL_PATH, "-C", "/opt"])
+        ctx.run_command(
+            ["sudo", "tar", "-xzf", DOWNLOAD_TARBALL_PATH, "-C", "/opt"], capture=False
+        )
     elif method.kind == "script":
-        ctx.run_command(["bash", "-c", f"curl -fsSL {method.identifier} | bash"])
+        ctx.run_command(["bash", "-c", f"curl -fsSL {method.identifier} | bash"], capture=False)
     else:
         raise UnsupportedPlatformError(f"Unknown install method kind: {method.kind}")
 

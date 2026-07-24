@@ -26,7 +26,7 @@ class DnfProvider:
     def install(self, ctx: RunContext, package: str, *, cask: bool = False) -> None:
         if cask:
             raise UnsupportedPlatformError("dnf has no concept of a Homebrew cask")
-        ctx.run_command(["sudo", "dnf", "install", "-y", package])
+        ctx.run_command(["sudo", "dnf", "install", "-y", package], capture=False)
 
     def list_installed(self, ctx: RunContext) -> set[str]:
         result = ctx.run_command(["rpm", "-qa", "--qf", "%{NAME}\n"], check=False)

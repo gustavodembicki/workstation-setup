@@ -7,6 +7,15 @@ from workstation_setup.steps.base import StepStatus
 from workstation_setup.steps.homebrew import InstallHomebrewStep
 
 
+class RecordingRunner:
+    def __init__(self):
+        self.calls = []
+
+    def run(self, args, *, input=None, env=None, capture=True):
+        self.calls.append((args, capture))
+        return CommandResult(0, "", "", args)
+
+
 def test_check_installed_already_installed_when_brew_available(monkeypatch):
     monkeypatch.setattr(BrewProvider, "is_available", lambda self, ctx: True)
     ctx = make_context()
@@ -24,15 +33,16 @@ def test_check_installed_not_installed_when_brew_unavailable(monkeypatch):
 def test_run_invokes_official_install_script_with_noninteractive_env(monkeypatch):
     ensure_path_calls = []
     monkeypatch.setattr(homebrew_module, "ensure_brew_on_path", ensure_path_calls.append)
-    runner = FakeRunner(default_result=CommandResult(0, "", "", []))
+    runner = RecordingRunner()
     ctx = make_context(runner=runner)
 
     result = InstallHomebrewStep().run(ctx)
 
     assert result.status == StepStatus.INSTALLED
-    [call_args] = runner.calls
+    [(call_args, capture)] = runner.calls
     assert call_args[0] == "/bin/bash"
     assert "curl" in call_args[2] and "| bash" in call_args[2]
+    assert capture is False
     assert ensure_path_calls == [ctx.os_info]
 
 

@@ -28,19 +28,20 @@ TRUSTLIST: dict[str, AppLinks] = {
         gpg_key_url="https://dl.google.com/linux/linux_signing_key.pub",
         apt_repo_line=(
             "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] "
-            "http://dl.google.com/linux/chrome/deb/ stable main"
+            "https://dl.google.com/linux/chrome/deb/ stable main"
         ),
     ),
     "spotify": AppLinks(
         gpg_key_url="https://download.spotify.com/debian/pubkey_6224F9941A8AA6D1.gpg",
         apt_repo_line=(
             "deb [signed-by=/usr/share/keyrings/spotify.gpg] "
-            "http://repository.spotify.com stable non-free"
+            "https://repository.spotify.com stable non-free"
         ),
     ),
     "slack": AppLinks(
         download_url=(
-            "https://downloads.slack-edge.com/desktop-releases/linux/x64/latest/slack-desktop-amd64.deb"
+            "https://downloads.slack-edge.com/desktop-releases/linux/x64/4.51.180/"
+            "slack-desktop-4.51.180-amd64.deb"
         ),
     ),
     "devin_desktop": AppLinks(
@@ -53,10 +54,9 @@ TRUSTLIST: dict[str, AppLinks] = {
     "vscode": AppLinks(
         download_url="https://code.visualstudio.com/sha/download?build=stable&os=linux-deb-x64",
     ),
-    "windsurf": AppLinks(
-        download_url="https://windsurf-stable.codeiumdata.com/linux-x64/stable/latest/Windsurf.deb",
+    "cursor": AppLinks(
+        download_url="https://api2.cursor.sh/updates/download/golden/linux-x64/cursor/3.11",
     ),
-    "cursor": AppLinks(download_url="https://downloader.cursor.sh/linux/appImage/x64"),
 }
 
 
@@ -75,6 +75,6 @@ def apt_repo_setup(
     )
 
     def _setup(ctx: RunContext) -> None:
-        ctx.run_command(["bash", "-c", script])
+        ctx.run_command(["bash", "-c", script], capture=False)
 
     return _setup

@@ -119,6 +119,7 @@ def test_execute_apt_repo_runs_repo_setup_then_installs():
     assert setup_calls == [ctx]
     assert ["sudo", "apt-get", "update"] in runner.calls
     assert ["sudo", "apt-get", "install", "-y", "google-chrome-stable"] in runner.calls
+    assert runner.captures == [False, False]
 
 
 def test_execute_deb_download_downloads_then_installs():
@@ -130,6 +131,7 @@ def test_execute_deb_download_downloads_then_installs():
     assert runner.calls[0][:2] == ["curl", "-fSL"]
     assert "--progress-bar" in runner.calls[0]
     assert runner.calls[1][:3] == ["sudo", "dpkg", "-i"]
+    assert runner.captures == [False, False]
 
 
 def test_execute_deb_download_falls_back_to_apt_fix_broken_on_dpkg_failure():
@@ -178,6 +180,7 @@ def test_execute_script_pipes_curl_to_bash():
     [call] = runner.calls
     assert call[0] == "bash"
     assert "curl -fsSL https://sdk.cloud.google.com | bash" in call[2]
+    assert runner.captures == [False]
 
 
 def test_install_app_unsupported_on_linux_when_no_method_matches():
