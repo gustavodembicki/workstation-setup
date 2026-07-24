@@ -43,6 +43,7 @@ def test_apt_install_uses_apt_get():
     AptProvider().install(ctx, "git")
 
     assert runner.calls == [["sudo", "apt-get", "install", "-y", "git"]]
+    assert runner.captures == [False]
 
 
 def test_dnf_install_uses_dnf():
@@ -52,6 +53,7 @@ def test_dnf_install_uses_dnf():
     DnfProvider().install(ctx, "git")
 
     assert runner.calls == [["sudo", "dnf", "install", "-y", "git"]]
+    assert runner.captures == [False]
 
 
 def test_pacman_install_uses_pacman():
@@ -61,6 +63,7 @@ def test_pacman_install_uses_pacman():
     PacmanProvider().install(ctx, "git")
 
     assert runner.calls == [["sudo", "pacman", "-S", "--noconfirm", "git"]]
+    assert runner.captures == [False]
 
 
 def test_apt_list_installed_parses_dpkg_query_output():

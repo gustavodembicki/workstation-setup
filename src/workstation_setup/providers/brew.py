@@ -73,7 +73,7 @@ class BrewProvider:
         if cask:
             args.append("--cask")
         args.append(package)
-        ctx.run_command(args)
+        ctx.run_command(args, capture=False)
 
     def reinstall(self, ctx: RunContext, package: str, *, cask: bool = False) -> None:
         """Force a real reinstall — used when the user explicitly asks to
@@ -89,7 +89,7 @@ class BrewProvider:
         if cask:
             args.append("--cask")
         args.append(package)
-        ctx.run_command(args)
+        ctx.run_command(args, capture=False)
 
     def list_installed(self, ctx: RunContext) -> set[str]:
         result = ctx.run_command([self._brew(ctx), "list", "--versions"], check=False)

@@ -81,7 +81,7 @@ src/workstation_setup/
 ├── registry/
 │   ├── models.py               # AppSpec, InstallMethod dataclasses
 │   ├── apps.py                  # Chrome, Slack, Spotify, Devin Desktop, GCloud SDK
-│   └── ides.py                   # JetBrains Toolbox, VS Code, Windsurf, Cursor
+│   └── ides.py                   # JetBrains Toolbox, VS Code, Cursor
 │
 └── ui/
     └── prompts.py              # confirm_step / checkbox_select / text_input / select_existing_action

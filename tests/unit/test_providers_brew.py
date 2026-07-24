@@ -64,6 +64,7 @@ def test_install_formula_calls_brew_install():
     BrewProvider().install(ctx, "zsh")
 
     assert runner.calls == [["brew", "install", "zsh"]]
+    assert runner.captures == [False]
 
 
 def test_install_cask_adds_cask_flag_on_macos():
@@ -75,6 +76,7 @@ def test_install_cask_adds_cask_flag_on_macos():
     BrewProvider().install(ctx, "google-chrome", cask=True)
 
     assert runner.calls == [["brew", "install", "--cask", "google-chrome"]]
+    assert runner.captures == [False]
 
 
 def test_install_cask_on_linux_raises():
@@ -91,6 +93,7 @@ def test_reinstall_formula_calls_brew_reinstall():
     BrewProvider().reinstall(ctx, "zsh")
 
     assert runner.calls == [["brew", "reinstall", "zsh"]]
+    assert runner.captures == [False]
 
 
 def test_reinstall_cask_adds_cask_flag_on_macos():
@@ -102,6 +105,7 @@ def test_reinstall_cask_adds_cask_flag_on_macos():
     BrewProvider().reinstall(ctx, "google-chrome", cask=True)
 
     assert runner.calls == [["brew", "reinstall", "--cask", "google-chrome"]]
+    assert runner.captures == [False]
 
 
 def test_reinstall_cask_on_linux_raises():

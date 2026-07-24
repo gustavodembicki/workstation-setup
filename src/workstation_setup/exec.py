@@ -66,6 +66,7 @@ class FakeRunner:
     responses: dict[str, CommandResult] = field(default_factory=dict)
     default_result: CommandResult | None = None
     calls: list[list[str]] = field(default_factory=list)
+    captures: list[bool] = field(default_factory=list)
 
     def run(
         self,
@@ -76,6 +77,7 @@ class FakeRunner:
         capture: bool = True,
     ) -> CommandResult:
         self.calls.append(args)
+        self.captures.append(capture)
         key = args[0] if args else ""
         if key in self.responses:
             return self.responses[key]

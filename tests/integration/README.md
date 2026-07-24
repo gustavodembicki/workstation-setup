@@ -16,7 +16,9 @@ the project installed in a venv — same setup, different base image.
 ### Build the images
 
 ```bash
-docker compose -f tests/integration/docker/docker-compose.yml build
+make build                 # Ubuntu (default)
+make build DISTRO=fedora   # Fedora
+make build DISTRO=arch     # Arch
 ```
 
 (or build a single distro with plain `docker`: `docker build -f
@@ -25,7 +27,8 @@ tests/integration/docker/Dockerfile.ubuntu -t workstation-setup-smoketest .`)
 ### Enter a container
 
 ```bash
-docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu   # or fedora / arch
+make run                   # Ubuntu (default)
+make run DISTRO=fedora     # or DISTRO=arch
 ```
 
 This drops you into `/bin/bash` as the non-root `dev` user, inside a copy of
@@ -86,12 +89,12 @@ automatically (`--rm`); nothing persists between runs.
 ### Iterating on code changes
 
 `COPY` happens at build time, so editing source on the host doesn't show up
-in a running container — rebuild after each change (Docker layer caching
-keeps this fast; only the `COPY` + `pip install -e` layers re-run):
+in a running container. `make rebuild` clears Compose state then creates a
+no-cache image for a fully fresh test environment:
 
 ```bash
-docker compose -f tests/integration/docker/docker-compose.yml build ubuntu
-docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu
+make rebuild
+make run
 ```
 
 (Bind-mounting the repo instead of rebuilding is tempting for faster
@@ -102,9 +105,9 @@ worth the fragility here; just rebuild.)
 ### All three distros
 
 ```bash
-docker compose -f tests/integration/docker/docker-compose.yml run --rm ubuntu
-docker compose -f tests/integration/docker/docker-compose.yml run --rm fedora
-docker compose -f tests/integration/docker/docker-compose.yml run --rm arch
+make run DISTRO=ubuntu
+make run DISTRO=fedora
+make run DISTRO=arch
 ```
 
 ## macOS

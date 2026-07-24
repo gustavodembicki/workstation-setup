@@ -26,7 +26,7 @@ class AptProvider:
     def install(self, ctx: RunContext, package: str, *, cask: bool = False) -> None:
         if cask:
             raise UnsupportedPlatformError("apt has no concept of a Homebrew cask")
-        ctx.run_command(["sudo", "apt-get", "install", "-y", package])
+        ctx.run_command(["sudo", "apt-get", "install", "-y", package], capture=False)
 
     def list_installed(self, ctx: RunContext) -> set[str]:
         result = ctx.run_command(

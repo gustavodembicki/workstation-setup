@@ -1,0 +1,26 @@
+name: Validate application sources
+
+on:
+  pull_request:
+    paths:
+      - "src/workstation_setup/registry/**"
+      - ".github/workflows/validate-app-sources.yml"
+  push:
+    branches: ["main"]
+    paths:
+      - "src/workstation_setup/registry/**"
+      - ".github/workflows/validate-app-sources.yml"
+  schedule:
+    - cron: "23 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check trusted vendor endpoints
+        run: PYTHONPATH=src python -m workstation_setup.registry.url_validation

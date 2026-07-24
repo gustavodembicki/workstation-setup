@@ -28,7 +28,7 @@ asdf      asdf-plugins  git  gh         gh-auth-login  ssh-key
 IDE IDs:
 
 ```text
-jetbrains_toolbox  vscode  windsurf  cursor
+jetbrains_toolbox  vscode  cursor
 ```
 
 Application IDs:

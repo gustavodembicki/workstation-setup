@@ -26,7 +26,7 @@ class PacmanProvider:
     def install(self, ctx: RunContext, package: str, *, cask: bool = False) -> None:
         if cask:
             raise UnsupportedPlatformError("pacman has no concept of a Homebrew cask")
-        ctx.run_command(["sudo", "pacman", "-S", "--noconfirm", package])
+        ctx.run_command(["sudo", "pacman", "-S", "--noconfirm", package], capture=False)
 
     def list_installed(self, ctx: RunContext) -> set[str]:
         result = ctx.run_command(["pacman", "-Qq"], check=False)

@@ -20,7 +20,7 @@ class AppSpec:
     windows: InstallMethod | None = None       # unused seam, see 01_architecture.md
 ```
 
-`registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 4 IDEs (JetBrains Toolbox, VS Code, Windsurf, Cursor). Same `AppSpec` shape — they're only split into two files by convention (apps vs. IDEs), not because the underlying model differs. Both lists get wrapped into `AppSpecStep`s and flattened into `MASTER_REGISTRY` in `cli.py`, so an IDE and an everyday app show up side by side with Homebrew/zsh/etc. in the same menu — there's no separate "IDE screen" or "apps screen" anymore.
+`registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 3 IDEs (JetBrains Toolbox, VS Code, Cursor). Same `AppSpec` shape — they're only split into two files by convention (apps vs. IDEs), not because the underlying model differs. Both lists get wrapped into `AppSpecStep`s and flattened into `MASTER_REGISTRY` in `cli.py`, so an IDE and an everyday app show up side by side with Homebrew/zsh/etc. in the same menu — there's no separate "IDE screen" or "apps screen" anymore.
 
 ## The trustlist (`registry/trustlist.py`)
 
@@ -56,6 +56,14 @@ AppSpec(
 ```
 
 ## Linux dispatch logic (`_pick_linux_method` in `steps/gui_apps.py`)
+
+## Catalog and source-health flow
+
+The new registry/catalog.py module is the canonical enumerator across application categories. Use it for cross-cutting validation rather than concatenating individual category lists; a future category only needs to be added to REGISTRIES.
+
+All trusted endpoints must use HTTPS. The Validate application sources GitHub workflow runs on registry-related pull requests, merges to main, manual dispatch, and every Monday. It invokes python -m workstation_setup.registry.url_validation, which probes every download URL, GPG-key URL, and repository URL embedded in an apt source line without downloading installers. Any bad response fails with the exact app_id.field that needs attention.
+
+When adding an application: add its AppSpec, add its TRUSTLIST routes, run pytest tests/unit, then run python -m workstation_setup.registry.url_validation. Require the source-health check alongside normal CI before merging.
 
 1. Look for an `InstallMethod` whose `distro_family` matches the detected distro exactly (e.g. `"debian"` for Ubuntu) → use it if found.
 2. Otherwise, fall back to the first entry with `distro_family=None` (a generic, cross-distro method) if one exists.
