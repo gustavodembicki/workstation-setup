@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from workstation_setup.providers.winget import WingetProvider
 from workstation_setup.registry.models import AppSpec, InstallMethod
 from workstation_setup.steps.base import Step, StepResult, StepStatus
 from workstation_setup.steps.gui_apps import _pick_linux_method, install_app
@@ -17,6 +18,7 @@ _PREVIEW_BY_KIND = {
     "appimage": lambda m: f"download {m.identifier} to ~/Applications",
     "tarball": lambda m: f"download {m.identifier} and extract it to /opt",
     "script": lambda m: f"curl -fsSL {m.identifier} | bash",
+    "winget": lambda m: f"winget install --id {m.identifier} --exact --source winget",
 }
 
 
@@ -38,7 +40,15 @@ class AppSpecStep(Step):
         self.title = spec.display_name
         self.description = f"Install {spec.display_name}."
 
+    def is_applicable(self, ctx: RunContext) -> bool:
+        if ctx.os_info.family == "windows":
+            return self.spec.windows is not None
+        return True
+
     def check_installed(self, ctx: RunContext) -> StepStatus:
+        if ctx.os_info.family == "windows" and self.spec.windows is not None:
+            installed = WingetProvider().is_installed(ctx, self.spec.windows.identifier)
+            return StepStatus.ALREADY_INSTALLED if installed else StepStatus.NOT_INSTALLED
         if self.spec.check(ctx):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
@@ -54,4 +64,6 @@ class AppSpecStep(Step):
             if method is None:
                 return [f"No install method for {self.spec.display_name} on this distro"]
             return [_describe_method(method)]
+        if ctx.os_info.family == "windows" and self.spec.windows is not None:
+            return [_describe_method(self.spec.windows)]
         return [f"{self.spec.display_name} not supported on {ctx.os_info.family}"]

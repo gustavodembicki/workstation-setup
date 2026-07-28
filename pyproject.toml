@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "workstation-setup"
 version = "0.1.0"
-description = "Interactive wizard that bootstraps a fresh Linux/macOS developer workstation."
+description = "Interactive wizard that bootstraps a fresh Linux, macOS, or Windows workstation."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }

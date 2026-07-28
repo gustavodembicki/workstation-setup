@@ -25,6 +25,9 @@ homebrew  zsh  oh-my-zsh  zsh-theme  set-default-shell
 asdf      asdf-plugins  git  gh         gh-auth-login  ssh-key
 ```
 
+Homebrew, shell, and asdf IDs apply only to Linux/macOS. On Windows, the
+recommended core set is `git`, `gh`, `gh-auth-login`, and `ssh-key`.
+
 IDE IDs:
 
 ```text
@@ -37,6 +40,8 @@ Application IDs:
 chrome  spotify  slack  devin_desktop  gcloud_sdk
 ```
 
+`devin_desktop` is currently hidden on Windows.
+
 ## Examples
 
 ```bash
@@ -48,11 +53,18 @@ chrome  spotify  slack  devin_desktop  gcloud_sdk
 
 # Run explicit, non-interactive bootstrap targets.
 ./workstation-setup --yes --only homebrew --only git --only gh
+```
 
-# Preview a single Linux/macOS app's selected install method.
+```powershell
+# Windows equivalent (PowerShell).
+.\workstation-setup-windows-x86_64.exe --yes --only git --only gh
+```
+
+```bash
+# Preview a single app's platform-specific install method.
 ./workstation-setup --dry-run --only vscode
 ```
 
 The step IDs are stable implementation identifiers, not package names. An item
-can be unsupported on a particular Linux distribution even when its ID is
+can be unsupported or hidden on a particular platform even when its ID is
 valid. Consult [the usage guide](usage.md) for interactive and recovery flows.

@@ -36,7 +36,20 @@ def test_every_entry_check_is_callable_and_safe(name, registry):
         assert spec.check(ctx) in (True, False)
 
 
-@pytest.mark.parametrize("name,registry", ALL_REGISTRIES)
-def test_windsows_field_unused_in_v1(name, registry):
-    for spec in registry:
-        assert spec.windows is None
+def test_windows_package_ids_are_curated():
+    methods = {
+        spec.id: spec.windows.identifier if spec.windows else None
+        for _, registry in ALL_REGISTRIES
+        for spec in registry
+    }
+
+    assert methods == {
+        "chrome": "Google.Chrome",
+        "spotify": "Spotify.Spotify",
+        "slack": "SlackTechnologies.Slack",
+        "devin_desktop": None,
+        "gcloud_sdk": "Google.CloudSDK",
+        "jetbrains_toolbox": "JetBrains.Toolbox",
+        "vscode": "Microsoft.VisualStudioCode",
+        "cursor": "Anysphere.Cursor",
+    }

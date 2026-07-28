@@ -5,7 +5,7 @@
 ```python
 @dataclass
 class InstallMethod:
-    kind: Literal["brew_formula", "brew_cask", "apt_repo", "deb_download", "appimage", "tarball", "script"]
+    kind: Literal["brew_formula", "brew_cask", "apt_repo", "deb_download", "appimage", "tarball", "script", "winget"]
     identifier: str                          # formula/cask/package name, or a URL — depends on kind
     distro_family: str | None = None          # None = generic fallback, tried when no distro-specific entry matches
     repo_setup: Callable[[RunContext], None] | None = None   # apt_repo only: adds the vendor's repo/gpg key first
@@ -17,7 +17,7 @@ class AppSpec:
     check: Callable[[RunContext], bool]       # already installed?
     macos: InstallMethod                       # always exactly one — macOS story is simple (brew cask)
     linux: list[InstallMethod] = field(default_factory=list)   # ordered; first matching wins
-    windows: InstallMethod | None = None       # unused seam, see 01_architecture.md
+    windows: InstallMethod | None = None       # exact WinGet package ID when supported
 ```
 
 `registry/apps.py` holds the 5 initial GUI apps (Chrome, Slack, Spotify, Devin Desktop, Google Cloud SDK). `registry/ides.py` holds the 3 IDEs (JetBrains Toolbox, VS Code, Cursor). Same `AppSpec` shape — they're only split into two files by convention (apps vs. IDEs), not because the underlying model differs. Both lists get wrapped into `AppSpecStep`s and flattened into `MASTER_REGISTRY` in `cli.py`, so an IDE and an everyday app show up side by side with Homebrew/zsh/etc. in the same menu — there's no separate "IDE screen" or "apps screen" anymore.
@@ -52,6 +52,7 @@ AppSpec(
         ),
         # optionally a distro_family=None generic fallback (script/appimage/tarball)
     ],
+    windows=InstallMethod("winget", "Vendor.MyNewApp"),
 )
 ```
 
@@ -83,14 +84,17 @@ Why some apps only have a `distro_family="debian"` entry and no generic fallback
 | `appimage` | download into `~/Applications/`, `chmod +x` | re-downloads over the existing file |
 | `tarball` | download, `sudo tar -xzf ... -C /opt` | re-downloads and re-extracts |
 | `script` | `curl -fsSL <identifier> \| bash` (see the word-splitting gotcha in [02_steps_and_providers.md](02_steps_and_providers.md)) | re-runs the same installer script |
+| `winget` | install the exact WinGet ID from the `winget` source | repeats with `--force` |
 
-Only `brew_cask`/`brew_formula` need a distinct code path for reinstall — everything else is naturally idempotent, so "reinstall" is just running the same method again.
+Homebrew and WinGet methods have distinct reinstall paths; other methods rerun
+their normal install route.
 
 ## `AppSpecStep` (`steps/app_spec_step.py`)
 
 Adapts one `AppSpec` into an ordinary `Step` so it can sit in `MASTER_REGISTRY` next to Homebrew/zsh/etc.:
 
-- `check_installed` → `spec.check(ctx)`
+- `check_installed` → `spec.check(ctx)` on Unix; exact WinGet package detection on Windows
+- `is_applicable` → hides the app on Windows when `spec.windows is None`
 - `run(ctx, *, reinstall=False)` → `install_app(ctx, spec, reinstall=reinstall)`
 - `dry_run_preview` → one line describing whichever `InstallMethod` would be used on the current OS/distro
 

@@ -8,27 +8,30 @@ environment, before cutting a release.
 
 ## Linux (Docker)
 
-Three Dockerfiles cover the three package-manager fallback paths for GUI
-apps (apt/dnf/pacman): `Dockerfile.ubuntu`, `Dockerfile.fedora`,
-`Dockerfile.arch`. Each builds a disposable, non-root, sudo-capable user with
-the project installed in a venv — same setup, different base image.
+Three Dockerfiles under `docker/linux/` cover the package-manager fallback
+paths for GUI apps (apt/dnf/pacman). Each builds a disposable, non-root,
+sudo-capable user with the project installed in a venv.
 
 ### Build the images
 
 ```bash
-make build                 # Ubuntu (default)
-make build DISTRO=fedora   # Fedora
-make build DISTRO=arch     # Arch
+make build-linux                 # Ubuntu (default)
+make build-linux DISTRO=fedora   # Fedora
+make build-linux DISTRO=arch     # Arch
+
+# Positional form is also accepted:
+make build linux DISTRO=fedora
 ```
 
 (or build a single distro with plain `docker`: `docker build -f
-tests/integration/docker/Dockerfile.ubuntu -t workstation-setup-smoketest .`)
+tests/integration/docker/linux/Dockerfile.ubuntu -t workstation-setup-smoketest .`)
 
 ### Enter a container
 
 ```bash
-make run                   # Ubuntu (default)
-make run DISTRO=fedora     # or DISTRO=arch
+make run-linux                   # Ubuntu (default)
+make run-linux DISTRO=fedora     # or DISTRO=arch
+make run linux DISTRO=arch       # positional equivalent
 ```
 
 This drops you into `/bin/bash` as the non-root `dev` user, inside a copy of
@@ -89,12 +92,12 @@ automatically (`--rm`); nothing persists between runs.
 ### Iterating on code changes
 
 `COPY` happens at build time, so editing source on the host doesn't show up
-in a running container. `make rebuild` clears Compose state then creates a
+in a running container. `make rebuild-linux` clears Compose state then creates a
 no-cache image for a fully fresh test environment:
 
 ```bash
-make rebuild
-make run
+make rebuild-linux
+make run-linux
 ```
 
 (Bind-mounting the repo instead of rebuilding is tempting for faster
@@ -105,9 +108,9 @@ worth the fragility here; just rebuild.)
 ### All three distros
 
 ```bash
-make run DISTRO=ubuntu
-make run DISTRO=fedora
-make run DISTRO=arch
+make run-linux DISTRO=ubuntu
+make run-linux DISTRO=fedora
+make run-linux DISTRO=arch
 ```
 
 ## macOS
@@ -118,3 +121,39 @@ macOS to run on Apple hardware, and there is no Linux-container equivalent of
 release, run the same manual walkthrough on a spare Mac or a disposable local
 VM (e.g. UTM/Tart) / scratch user account — this is a pre-release gate, not
 something to automate.
+
+## Windows container
+
+`docker/windows/` is deliberately separate from the Linux Compose project.
+It uses `python:3.12-windowsservercore-ltsc2022` and requires Docker
+Desktop/Engine switched to Windows containers:
+
+```powershell
+make build-windows
+make test-windows
+make run-windows
+
+# Positional form:
+make build windows
+```
+
+`make test-windows` runs the unit suite, Ruff, PyInstaller, and the resulting
+`.exe --version` smoke test. `make validate` parses both Linux and Windows
+Compose files without requiring either daemon mode. Build/run/test targets
+check the active daemon OS first and explain how to switch on mismatch.
+
+Windows Server Core containers do not have the Desktop/App Installer user
+environment required for this project's WinGet application routes. Microsoft
+also does not support the WinGet CLI in the container-style LocalSystem
+context. Therefore the container validates native Windows code and packaging,
+not real GUI application installation.
+
+## Windows real-install verification
+
+Use a disposable Windows 10/11 x64 VM with Microsoft App Installer/WinGet.
+Run the release `.exe` from PowerShell and verify `--version`, a full
+`--dry-run`, `--yes --only git --only gh`, interactive GitHub authentication,
+SSH-key generation, and one WinGet-backed GUI app. Run the same package twice
+and confirm the second selection offers Reinstall/Modify, Leave as is, or
+Cancel. Also verify that a VM without WinGet exits with App Installer repair
+guidance and makes no installation attempt.

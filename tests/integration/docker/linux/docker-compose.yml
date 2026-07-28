@@ -1,0 +1,26 @@
+# Convenience wrapper around the three smoke-test Dockerfiles — one per
+# package-manager fallback path (apt/dnf/pacman). Not part of the automated
+# pytest suite; see tests/integration/README.md.
+#
+# Usage is exposed through `make build-linux` / `make run-linux`.
+services:
+  ubuntu:
+    build:
+      context: ../../../..
+      dockerfile: tests/integration/docker/linux/Dockerfile.ubuntu
+    stdin_open: true
+    tty: true
+
+  fedora:
+    build:
+      context: ../../../..
+      dockerfile: tests/integration/docker/linux/Dockerfile.fedora
+    stdin_open: true
+    tty: true
+
+  arch:
+    build:
+      context: ../../../..
+      dockerfile: tests/integration/docker/linux/Dockerfile.arch
+    stdin_open: true
+    tty: true

@@ -31,6 +31,8 @@ class GenerateSshKeyStep(Step):
 
     def is_applicable(self, ctx: RunContext) -> bool:
         # Only offered once gh is around — GitHub is the whole point of this step.
+        if ctx.os_info.family == "windows":
+            return command_exists("gh") and command_exists("ssh-keygen")
         return command_exists("gh")
 
     def check_installed(self, ctx: RunContext) -> StepStatus:

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from workstation_setup.exec import command_exists
 from workstation_setup.providers.brew import BrewProvider
+from workstation_setup.providers.winget import WingetProvider
 from workstation_setup.steps.base import Step, StepResult, StepStatus
 
 if TYPE_CHECKING:
@@ -13,14 +14,24 @@ if TYPE_CHECKING:
 class InstallGitStep(Step):
     id = "git"
     title = "git"
-    description = "Install git via Homebrew (keeps a modern, consistent version across machines)."
+    description = "Install a modern Git version through the platform package manager."
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
+        if ctx.os_info.family == "windows":
+            installed = WingetProvider().is_installed(ctx, "Git.Git")
+            return StepStatus.ALREADY_INSTALLED if installed else StepStatus.NOT_INSTALLED
         if command_exists("git"):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
     def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if ctx.os_info.family == "windows":
+            provider = WingetProvider()
+            if reinstall:
+                provider.reinstall(ctx, "Git.Git")
+            else:
+                provider.install(ctx, "Git.Git")
+            return StepResult(StepStatus.INSTALLED)
         if reinstall:
             BrewProvider().reinstall(ctx, "git")
         else:
@@ -28,20 +39,32 @@ class InstallGitStep(Step):
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
+        if ctx.os_info.family == "windows":
+            return ["winget install --id Git.Git --exact --source winget"]
         return ["brew install git"]
 
 
 class InstallGhStep(Step):
     id = "gh"
     title = "GitHub CLI (gh)"
-    description = "Install the GitHub CLI via Homebrew."
+    description = "Install the GitHub CLI through the platform package manager."
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
+        if ctx.os_info.family == "windows":
+            installed = WingetProvider().is_installed(ctx, "GitHub.cli")
+            return StepStatus.ALREADY_INSTALLED if installed else StepStatus.NOT_INSTALLED
         if command_exists("gh"):
             return StepStatus.ALREADY_INSTALLED
         return StepStatus.NOT_INSTALLED
 
     def run(self, ctx: RunContext, *, reinstall: bool = False) -> StepResult:
+        if ctx.os_info.family == "windows":
+            provider = WingetProvider()
+            if reinstall:
+                provider.reinstall(ctx, "GitHub.cli")
+            else:
+                provider.install(ctx, "GitHub.cli")
+            return StepResult(StepStatus.INSTALLED)
         if reinstall:
             BrewProvider().reinstall(ctx, "gh")
         else:
@@ -49,6 +72,8 @@ class InstallGhStep(Step):
         return StepResult(StepStatus.INSTALLED)
 
     def dry_run_preview(self, ctx: RunContext) -> list[str]:
+        if ctx.os_info.family == "windows":
+            return ["winget install --id GitHub.cli --exact --source winget"]
         return ["brew install gh"]
 
 

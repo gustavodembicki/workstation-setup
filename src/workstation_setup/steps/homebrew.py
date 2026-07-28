@@ -20,6 +20,9 @@ class InstallHomebrewStep(Step):
         "on both macOS and Linux (Linuxbrew)."
     )
 
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return ctx.os_info.family in ("linux", "macos")
+
     def check_installed(self, ctx: RunContext) -> StepStatus:
         if BrewProvider().is_available(ctx):
             return StepStatus.ALREADY_INSTALLED

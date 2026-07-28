@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING
 
 from workstation_setup import log
 from workstation_setup.errors import UnsupportedPlatformError
+from workstation_setup.exec import command_exists
 from workstation_setup.providers.apt import AptProvider
-from workstation_setup.providers.registry import get_brew_provider
+from workstation_setup.providers.registry import get_brew_provider, get_system_provider
+from workstation_setup.providers.winget import WingetProvider
 from workstation_setup.registry.models import AppSpec, InstallMethod
 from workstation_setup.steps.base import StepResult, StepStatus
 
@@ -50,6 +52,10 @@ def _execute_install_method(
     elif method.kind == "apt_repo":
         # `reinstall` needs no special branch here: re-running the repo setup
         # + apt-get install is safe and is itself the "reinstall" action.
+        # Minimal images and fresh Debian installs do not necessarily include
+        # GnuPG, although it is required to create a signed-by keyring.
+        if not command_exists("gpg"):
+            AptProvider().install(ctx, "gnupg")
         if method.repo_setup:
             method.repo_setup(ctx)
         ctx.run_command(["sudo", "apt-get", "update"], capture=False)
@@ -75,7 +81,16 @@ def _execute_install_method(
             ["sudo", "tar", "-xzf", DOWNLOAD_TARBALL_PATH, "-C", "/opt"], capture=False
         )
     elif method.kind == "script":
+        # The official Google Cloud installer currently calls `which`; ensure
+        # the small utility exists instead of relying on a desktop image.
+        if not command_exists("which"):
+            get_system_provider(ctx.os_info).install(ctx, "which")
         ctx.run_command(["bash", "-c", f"curl -fsSL {method.identifier} | bash"], capture=False)
+    elif method.kind == "winget":
+        if reinstall:
+            WingetProvider().reinstall(ctx, method.identifier)
+        else:
+            WingetProvider().install(ctx, method.identifier)
     else:
         raise UnsupportedPlatformError(f"Unknown install method kind: {method.kind}")
 
@@ -97,6 +112,10 @@ def install_app(ctx: RunContext, spec: AppSpec, *, reinstall: bool = False) -> S
                 detail=f"no install method for {spec.display_name} on this distro",
             )
         _execute_install_method(ctx, method, reinstall=reinstall)
+        return StepResult(StepStatus.INSTALLED)
+
+    if ctx.os_info.family == "windows" and spec.windows is not None:
+        _execute_install_method(ctx, spec.windows, reinstall=reinstall)
         return StepResult(StepStatus.INSTALLED)
 
     return StepResult(

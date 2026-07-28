@@ -1,7 +1,8 @@
-from factories import make_context
+from factories import make_context, make_os_info
 
 from workstation_setup.exec import CommandResult, FakeRunner
 from workstation_setup.providers.brew import BrewProvider
+from workstation_setup.providers.winget import WingetProvider
 from workstation_setup.steps import git_gh as git_gh_module
 from workstation_setup.steps.base import StepStatus
 from workstation_setup.steps.git_gh import GhAuthLoginStep, InstallGhStep, InstallGitStep
@@ -96,3 +97,48 @@ def test_gh_auth_login_run_uses_uncaptured_output_and_marks_authenticated():
 
     assert result.status == StepStatus.INSTALLED
     assert ctx.selections["gh_authenticated"] is True
+
+
+def test_git_check_installed_uses_winget_on_windows(monkeypatch):
+    checked = []
+    monkeypatch.setattr(
+        WingetProvider,
+        "is_installed",
+        lambda self, ctx, package: checked.append(package) or True,
+    )
+    ctx = make_context(
+        os_info=make_os_info(family="windows", distro_family=None, arch="AMD64")
+    )
+
+    assert InstallGitStep().check_installed(ctx) == StepStatus.ALREADY_INSTALLED
+    assert checked == ["Git.Git"]
+
+
+def test_git_run_installs_via_winget_on_windows(monkeypatch):
+    installed = []
+    monkeypatch.setattr(
+        WingetProvider, "install", lambda self, ctx, package: installed.append(package)
+    )
+    ctx = make_context(
+        os_info=make_os_info(family="windows", distro_family=None, arch="AMD64")
+    )
+
+    result = InstallGitStep().run(ctx)
+
+    assert installed == ["Git.Git"]
+    assert result.status == StepStatus.INSTALLED
+
+
+def test_gh_run_reinstalls_via_winget_on_windows(monkeypatch):
+    reinstalled = []
+    monkeypatch.setattr(
+        WingetProvider, "reinstall", lambda self, ctx, package: reinstalled.append(package)
+    )
+    ctx = make_context(
+        os_info=make_os_info(family="windows", distro_family=None, arch="AMD64")
+    )
+
+    result = InstallGhStep().run(ctx, reinstall=True)
+
+    assert reinstalled == ["GitHub.cli"]
+    assert result.status == StepStatus.INSTALLED

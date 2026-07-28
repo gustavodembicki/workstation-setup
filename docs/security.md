@@ -4,10 +4,11 @@
 
 `workstation-setup` does not accept an arbitrary package name or download URL
 from the user. The menu is assembled from a fixed registry of core steps, IDEs,
-and apps. Each app/IDE has an `AppSpec` with a macOS route and one or more
-Linux routes. App/IDE URLs used for downloads, scripts, GPG keys, and apt
-repository lines are centralized in `src/workstation_setup/registry/trustlist.py`;
-core installer URLs are explicit constants in their corresponding steps.
+and apps. Each app/IDE has an `AppSpec` with macOS/Linux routes and, when
+supported, an exact Windows WinGet package ID. App/IDE URLs used for downloads,
+scripts, GPG keys, and apt repository lines are centralized in
+`src/workstation_setup/registry/trustlist.py`; core installer URLs are explicit
+constants in their corresponding steps.
 
 That makes the set of external endpoints reviewable in one place. It does not
 make those endpoints risk-free: adding or changing a trustlist entry is a
@@ -22,7 +23,9 @@ Depending on your selections, the wizard can:
 - change the login shell with `chsh`, after a separate confirmation;
 - generate an ed25519 SSH key, with a separate confirmation before replacing an existing key;
 - start `gh auth login` attached to the real terminal, so credentials are never hidden in captured output;
-- upload a public SSH key to GitHub only through the chosen GitHub CLI flow.
+- upload a public SSH key to GitHub only through the chosen GitHub CLI flow;
+- invoke WinGet installers, which may request Windows elevation or vendor
+  license acceptance.
 
 Review terminal prompts and vendor content before granting elevated privileges
 or authenticating. The state file is designed to record step outcomes; treat
@@ -35,6 +38,8 @@ verification. This project currently does **not** maintain or verify checksums,
 signatures, provenance attestations, or pinned versions for all downloaded
 artifacts. Some routes use the vendor's apt GPG-key mechanism; others download
 `.deb`, AppImage, tarball, or script content directly from a trusted URL.
+Windows routes rely on package manifests and installer verification performed
+by WinGet rather than project-maintained checksums.
 
 As a result, use the tool only when you accept the relevant vendor trust and
 your network controls. For high-assurance environments, inspect the trustlist

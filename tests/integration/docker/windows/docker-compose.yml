@@ -1,0 +1,9 @@
+# Requires Docker Desktop/Engine switched to Windows containers. This image
+# validates Windows-native Python/tests/packaging, not WinGet GUI installs.
+services:
+  windows:
+    build:
+      context: ../../../..
+      dockerfile: tests/integration/docker/windows/Dockerfile
+    stdin_open: true
+    tty: true

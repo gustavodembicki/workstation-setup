@@ -45,15 +45,69 @@ def test_version_flag_prints_version():
     assert "workstation-setup" in result.output
 
 
-def test_main_exits_early_with_friendly_message_on_unsupported_platform(monkeypatch):
-    windows_os_info = make_os_info(family="windows", distro_family=None)
+def test_main_runs_on_windows_when_winget_is_available(monkeypatch):
+    saved: list[State] = []
     monkeypatch.setattr(cli.log, "configure", _fake_configure)
-    monkeypatch.setattr(cli, "detect_os", lambda: windows_os_info)
+    monkeypatch.setattr(
+        cli,
+        "detect_os",
+        lambda: make_os_info(
+            family="windows",
+            distro_family=None,
+            distro_name="Windows",
+            arch="AMD64",
+        ),
+    )
+    monkeypatch.setattr(cli, "load_state", lambda: State())
+    monkeypatch.setattr(cli, "save_state", lambda state: saved.append(state))
+    monkeypatch.setattr(cli, "refresh_windows_path", lambda: None)
+    monkeypatch.setattr(cli.WingetProvider, "is_available", lambda self, ctx: True)
+    monkeypatch.setattr(cli, "RECOMMENDED_PIPELINE", [])
+    monkeypatch.setattr(cli, "MASTER_REGISTRY", [])
+    monkeypatch.setattr(cli.wizard, "run_menu", lambda ctx, steps: [])
+
+    result = CliRunner().invoke(cli.main)
+
+    assert result.exit_code == 0
+    assert "windows" in result.output.lower()
+    assert len(saved) == 1
+
+
+def test_main_exits_with_guidance_when_winget_is_missing(monkeypatch):
+    monkeypatch.setattr(cli.log, "configure", _fake_configure)
+    monkeypatch.setattr(
+        cli,
+        "detect_os",
+        lambda: make_os_info(
+            family="windows",
+            distro_family=None,
+            distro_name="Windows",
+            arch="AMD64",
+        ),
+    )
+    monkeypatch.setattr(cli, "load_state", lambda: State())
+    monkeypatch.setattr(cli, "refresh_windows_path", lambda: None)
+    monkeypatch.setattr(cli.WingetProvider, "is_available", lambda self, ctx: False)
 
     result = CliRunner().invoke(cli.main)
 
     assert result.exit_code == 1
-    assert "does not support windows" in result.output
+    assert "winget is required" in result.output.lower()
+    assert "app installer" in result.output.lower()
+
+
+def test_main_rejects_windows_arm64(monkeypatch):
+    monkeypatch.setattr(cli.log, "configure", _fake_configure)
+    monkeypatch.setattr(
+        cli,
+        "detect_os",
+        lambda: make_os_info(family="windows", distro_family=None, arch="ARM64"),
+    )
+
+    result = CliRunner().invoke(cli.main)
+
+    assert result.exit_code == 1
+    assert "windows x64 only" in result.output.lower()
 
 
 def test_main_with_yes_and_no_only_does_nothing_but_still_saves_state(monkeypatch):

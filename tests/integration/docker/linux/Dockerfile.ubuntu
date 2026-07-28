@@ -1,15 +1,14 @@
-# Disposable environment for manually smoke-testing the real wizard on
-# Fedora — exercises the dnf fallback path for GUI apps.
+# Disposable environment for manually smoke-testing the real wizard on Ubuntu.
 # Not part of the automated pytest suite — see tests/integration/README.md.
-FROM fedora:40
+FROM ubuntu:24.04
 
-RUN dnf install -y \
-    gcc make curl git sudo ca-certificates procps-ng file \
-    python3 python3-pip \
-    && dnf clean all
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl git sudo ca-certificates procps file \
+    python3 python3-venv python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
 # Homebrew refuses to run as root, and most of the real install steps
-# (chsh, sudo dnf install, ...) assume a normal sudo-capable user.
+# (chsh, sudo apt-get install, ...) assume a normal sudo-capable user.
 RUN useradd -m -s /bin/bash dev && \
     echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev
 

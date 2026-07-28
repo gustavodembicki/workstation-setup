@@ -26,7 +26,7 @@ class Step(ABC):
 
 **`ALREADY_INSTALLED` is never a silent skip.** This used to short-circuit the wizard loop straight past the step with no prompt at all — that was the bug this architecture was rewritten to fix. Now, whenever `check_installed` returns `ALREADY_INSTALLED`, `wizard._resolve_already_installed` (used by both `run_recommended` and `run_menu`) calls `prompts.select_existing_action(step.title)` and asks the user directly:
 
-- **Reinstall / Modify** → `step.run(ctx, reinstall=True)`. For steps that wrap a Homebrew formula/cask (`homebrew.py`, `shell.py`'s `InstallZshStep`, `asdf.py`'s `InstallAsdfStep`, `git_gh.py`'s `InstallGitStep`/`InstallGhStep`, and `AppSpecStep` for `brew_formula`/`brew_cask` entries), `reinstall=True` calls `BrewProvider.reinstall` (`brew reinstall`) instead of `install` — a plain `brew install` on an already-installed package is a silent no-op, which isn't what a user asking to "reinstall" means. Steps that are already interactive/reconfigurable on every call — `ConfigureZshThemeStep`, `GenerateSshKeyStep`, `GhAuthLoginStep`, `AsdfPluginsStep` — just ignore the flag, because calling `run()` again already re-prompts (new theme, overwrite-confirmed key regen, re-auth, more plugins). That re-prompt-on-every-call behavior *is* the "modify" action.
+- **Reinstall / Modify** → `step.run(ctx, reinstall=True)`. Homebrew package steps call `BrewProvider.reinstall`; Windows package steps call `WingetProvider.reinstall` with `--force`. Interactive/configuration steps re-prompt because that is their modify behavior.
 - **Leave as is** → no side effects, recorded as `SKIPPED_BY_USER`.
 - **Cancel** → same as "leave as is."
 
@@ -39,6 +39,8 @@ The one exception: with `--yes` there's no terminal to ask, so an `ALREADY_INSTA
 - `GhAuthLoginStep.is_applicable` → `command_exists("gh")` (no point offering auth if gh isn't installed)
 - `GenerateSshKeyStep.is_applicable` → same gate — SSH key generation is only offered once `gh` exists, per the product decision that GitHub is the whole point of the key
 - `AsdfPluginsStep.is_applicable` → `command_exists("asdf")`
+- Unix-only Homebrew/shell/asdf steps explicitly exclude Windows.
+- `AppSpecStep` excludes Windows entries whose `windows` method is `None`.
 
 If `is_applicable` returns `False`, the step is excluded **entirely** — no state recorded, not even listed in the `run_menu` checkbox. This is the one place something is filtered out before the user sees it, and it's a capability gate (can't authenticate `gh` that isn't installed), not a judgment that the step is optional — everything in `MASTER_REGISTRY` is already optional.
 
@@ -55,7 +57,8 @@ class PackageProvider(Protocol):
 
 - **`BrewProvider`** (`providers/brew.py`) is the primary provider on **both** macOS and Linux (Linuxbrew). `install(..., cask=True)` raises `UnsupportedPlatformError` on Linux — Homebrew casks are macOS-only, full stop.
 - **`AptProvider` / `DnfProvider` / `PacmanProvider`** exist only as the Linux fallback path for GUI apps that have no Homebrew cask equivalent (see [03_registry_apps_ides.md](03_registry_apps_ides.md)). They are not used for the core toolchain (zsh, asdf, git, gh) — those always go through Homebrew for consistency across distros.
-- `providers/registry.py`: `get_brew_provider()` (always available, cross-family) vs. `get_system_provider(os_info)` (picks apt/dnf/pacman by `os_info.distro_family`, raises `UnsupportedPlatformError` for unknown distros or non-Linux).
+- **`WingetProvider`** is the Windows provider. It detects exact installed IDs with `winget list`, installs exact IDs from the `winget` source, and forces reinstall when requested.
+- `providers/registry.py`: `get_brew_provider()` for Unix Homebrew; `get_system_provider(os_info)` picks apt/dnf/pacman on Linux or WinGet on Windows.
 
 ## The PATH gotcha — read this before adding a step that installs a brew package
 
@@ -63,6 +66,11 @@ Homebrew's bin directory (`/opt/homebrew/bin`, `/usr/local/bin`, or `/home/linux
 
 1. **`BrewProvider` invokes `brew` itself via an absolute, resolved path** when it's not yet on `PATH` (`_brew()` / `resolve_brew_binary()`), so `brew install X` always works regardless of `PATH` state.
 2. **Anything that shells out to a *brew-installed package's binary* by bare name** (the Oh My Zsh installer invoking `zsh`, `asdf plugin add`, `gh auth login`, ...) needs `PATH` itself updated. That's what `ensure_brew_on_path(os_info)` does — it's called once in `cli.py` at startup (covers "Homebrew was already installed before this run") and again at the end of `InstallHomebrewStep.run()` (covers "Homebrew was just installed in this run"). If you add a new step whose `run()` shells out to a brew-installed binary by name, you don't need to call this yourself — it's already guaranteed to have run before any later step gets a chance to execute, as long as `InstallHomebrewStep` stays first in both `RECOMMENDED_PIPELINE` and `MASTER_REGISTRY` (`cli.py`). Both `run_recommended` and `run_menu` process selected/applicable steps in list order, so this holds even when the user picks items out of the big menu rather than going through the recommended bootstrap.
+
+Windows has the same-process variant of this problem: installers update the
+persisted environment, not the running wizard. `refresh_windows_path()` runs
+at startup and after every WinGet install/reinstall, including Git's `usr/bin`
+directory so `ssh-keygen` is available to the later SSH step.
 
 This was a real bug caught by the Docker integration smoke test (see [04_testing.md](04_testing.md)): the Oh My Zsh install step failed with "Zsh is not installed" immediately after the zsh step had, in fact, just succeeded — because the new `zsh` binary wasn't resolvable from the current process's `PATH`.
 

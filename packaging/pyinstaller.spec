@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
-# Single spec used identically by both CI runners (ubuntu-latest, macos-latest).
+# Single spec used identically by the Linux, macOS, and Windows CI runners.
 # PyInstaller reads the current platform at build time and emits the matching
-# binary format (ELF on Linux, Mach-O on macOS) — it does not cross-compile.
+# binary format (ELF, Mach-O, or PE/.exe) — it does not cross-compile.
 
 import os
 

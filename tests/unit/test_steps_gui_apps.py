@@ -4,7 +4,9 @@ from factories import make_context, make_os_info
 
 from workstation_setup.exec import CommandResult, FakeRunner
 from workstation_setup.providers.brew import BrewProvider
+from workstation_setup.providers.winget import WingetProvider
 from workstation_setup.registry.models import AppSpec, InstallMethod
+from workstation_setup.steps import gui_apps
 from workstation_setup.steps.base import StepStatus
 from workstation_setup.steps.gui_apps import (
     _execute_install_method,
@@ -101,10 +103,11 @@ def test_execute_brew_formula_reinstall_uses_brew_reinstall(monkeypatch):
     assert calls == ["gcloud-sdk"]
 
 
-def test_execute_apt_repo_runs_repo_setup_then_installs():
+def test_execute_apt_repo_runs_repo_setup_then_installs(monkeypatch):
     setup_calls = []
     runner = FakeRunner(default_result=CommandResult(0, "", "", []))
     ctx = make_context(runner=runner)
+    monkeypatch.setattr(gui_apps, "command_exists", lambda name: True)
 
     _execute_install_method(
         ctx,
@@ -120,6 +123,16 @@ def test_execute_apt_repo_runs_repo_setup_then_installs():
     assert ["sudo", "apt-get", "update"] in runner.calls
     assert ["sudo", "apt-get", "install", "-y", "google-chrome-stable"] in runner.calls
     assert runner.captures == [False, False]
+
+
+def test_execute_apt_repo_installs_gnupg_when_missing(monkeypatch):
+    runner = FakeRunner(default_result=CommandResult(0, "", "", []))
+    ctx = make_context(runner=runner)
+    monkeypatch.setattr(gui_apps, "command_exists", lambda name: name != "gpg")
+
+    _execute_install_method(ctx, InstallMethod("apt_repo", "thing", repo_setup=lambda ctx: None))
+
+    assert runner.calls[0] == ["sudo", "apt-get", "install", "-y", "gnupg"]
 
 
 def test_execute_deb_download_downloads_then_installs():
@@ -203,3 +216,29 @@ def test_install_app_passes_reinstall_through_to_brew(monkeypatch):
     install_app(ctx, spec, reinstall=True)
 
     assert calls == [("thing", True)]
+
+
+def test_execute_winget_reinstall_uses_winget_provider(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        WingetProvider, "reinstall", lambda self, ctx, package: calls.append(package)
+    )
+    ctx = make_context(os_info=make_os_info(family="windows", distro_family=None))
+
+    _execute_install_method(ctx, InstallMethod("winget", "Vendor.Thing"), reinstall=True)
+
+    assert calls == ["Vendor.Thing"]
+
+
+def test_install_app_uses_windows_method(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        WingetProvider, "install", lambda self, ctx, package: calls.append(package)
+    )
+    spec = make_spec(windows=InstallMethod("winget", "Vendor.Thing"))
+    ctx = make_context(os_info=make_os_info(family="windows", distro_family=None))
+
+    result = install_app(ctx, spec)
+
+    assert result.status == StepStatus.INSTALLED
+    assert calls == ["Vendor.Thing"]

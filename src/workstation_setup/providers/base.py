@@ -9,10 +9,9 @@ if TYPE_CHECKING:
 class PackageProvider(Protocol):
     """Abstracts a system package manager (brew, apt, dnf, pacman).
 
-    Homebrew is the primary provider on both macOS and Linux (Linuxbrew);
-    apt/dnf/pacman exist mainly for the native-package fallback path used to
-    install Linux GUI apps that don't ship as Homebrew casks (casks are
-    macOS-only).
+    Homebrew is the primary provider on macOS and Linux (Linuxbrew);
+    apt/dnf/pacman provide Linux-native fallback routes, while WinGet is the
+    native Windows provider.
     """
 
     name: str

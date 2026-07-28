@@ -12,8 +12,13 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: workstation-setup-linux-x86_64
+            built_name: workstation-setup
           - os: macos-latest
             artifact_name: workstation-setup-macos-arm64
+            built_name: workstation-setup
+          - os: windows-latest
+            artifact_name: workstation-setup-windows-x86_64.exe
+            built_name: workstation-setup.exe
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -28,8 +33,11 @@ jobs:
       - name: Build standalone executable
         run: pyinstaller packaging/pyinstaller.spec
 
+      - name: Smoke-test standalone executable
+        run: python -c "import subprocess; subprocess.run(['dist/${{ matrix.built_name }}', '--version'], check=True)"
+
       - name: Rename artifact
-        run: mv dist/workstation-setup dist/${{ matrix.artifact_name }}
+        run: python -c "from pathlib import Path; Path('dist/${{ matrix.built_name }}').replace('dist/${{ matrix.artifact_name }}')"
 
       - uses: actions/upload-artifact@v4
         with:

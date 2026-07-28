@@ -3,7 +3,7 @@
 ## Two tiers, on purpose
 
 - **`tests/unit/`** — runs under plain `pytest`, in CI, on every push. No real subprocess calls, no real filesystem mutation outside `tmp_path`. This is where correctness of the *decision logic* (idempotency checks, dispatch logic, wizard orchestration, registry shape) is verified.
-- **`tests/integration/`** — **not** collected by `pytest` (`pyproject.toml`'s `testpaths` is `["tests/unit"]`). Real installers are inherently slow, environment-mutating, and sometimes interactive (`gh auth login`, `chsh`). Verified manually, in a disposable Docker container (or a scratch VM for macOS) before cutting a release. See `tests/integration/README.md`.
+- **`tests/integration/`** — **not** collected by `pytest`. Linux Docker images exercise real installers; the separate Windows Server Core image exercises tests and PyInstaller only. Real Windows WinGet installs require a Windows 10/11 VM, and macOS requires Apple hardware/VM.
 
 Do not try to make real `brew install` / `chsh` / `ssh-keygen` calls pass under `pytest` — mock the `Runner`, as below.
 
@@ -52,11 +52,12 @@ If a test needs to assert on printed content, use `log.console_export()` (requir
 - **Never let a test touch a real system file path unconditionally present on the test runner** — e.g. `SetDefaultShellStep` reads `/etc/shells` (a file that genuinely exists on real Linux/macOS CI runners!). It's exposed as the module-level `shell.SHELLS_FILE` constant specifically so tests can monkeypatch it to a `tmp_path` file — never assume "it won't exist in the test sandbox," because on real CI runners it does.
 - **`os.environ` mutations** (`ensure_brew_on_path`) — monkeypatch `brew_module.os.environ` to a fresh dict per test, don't mutate the real process environment from a unit test.
 - **Cross-platform path construction** — code that builds a known Unix-style path (Homebrew's install locations) uses `PurePosixPath`, not `Path`, specifically so tests behave the same on a Windows dev machine as they will in production on Linux/macOS. If you add a new hardcoded POSIX path and need to manipulate it (`.parent`, `/`), use `PurePosixPath`, not `Path`.
+- **Windows provider tests** — simulate WinGet HRESULTs with `FakeRunner`; never invoke the host's real WinGet. Patch `refresh_windows_path` around install tests.
 
 ## Manual/Docker verification (`tests/integration/`)
 
 ```bash
-docker build -f tests/integration/docker/Dockerfile.ubuntu -t workstation-setup-smoketest .
+docker build -f tests/integration/docker/linux/Dockerfile.ubuntu -t workstation-setup-smoketest .
 docker run -it --rm workstation-setup-smoketest
 # inside the container:
 source .venv/bin/activate
