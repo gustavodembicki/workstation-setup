@@ -31,7 +31,10 @@ class RunContext:
         input: str | None = None,
         env: dict[str, str] | None = None,
         capture: bool = True,
+        read_only: bool = False,
     ):
+        # read_only=True is reserved for live inspection commands (for example
+        # `winget list`) that remain safe and necessary during --dry-run.
         # capture=False means the subprocess is interactive or streams its own
         # progress straight to the terminal (gh auth login, curl --progress-bar)
         # — suspend any active spinner so it doesn't repaint over that output.
@@ -44,5 +47,5 @@ class RunContext:
                 input=input,
                 env=env,
                 capture=capture,
-                dry_run=self.dry_run,
+                dry_run=self.dry_run and not read_only,
             )

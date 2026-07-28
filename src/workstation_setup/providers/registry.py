@@ -7,6 +7,7 @@ from workstation_setup.providers.base import PackageProvider
 from workstation_setup.providers.brew import BrewProvider
 from workstation_setup.providers.dnf import DnfProvider
 from workstation_setup.providers.pacman import PacmanProvider
+from workstation_setup.providers.winget import WingetProvider
 
 _LINUX_PROVIDERS: dict[str, type[PackageProvider]] = {
     "debian": AptProvider,
@@ -23,9 +24,14 @@ def get_brew_provider() -> BrewProvider:
 
 
 def get_system_provider(os_info: OSInfo) -> PackageProvider:
-    """The distro-native package manager, used as the fallback path for
-    Linux GUI apps that have no Homebrew cask equivalent.
+    """The OS-native package manager.
+
+    On Linux this is the fallback path for GUI apps that have no Homebrew
+    equivalent. On Windows WinGet is the primary provider.
     """
+    if os_info.family == "windows":
+        return WingetProvider()
+
     if os_info.family != "linux":
         raise UnsupportedPlatformError(
             f"No native system provider for {os_info.family!r}; use Homebrew instead"

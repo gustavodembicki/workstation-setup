@@ -16,6 +16,7 @@ IDE_REGISTRY: list[AppSpec] = [
                 TRUSTLIST["jetbrains_toolbox"].download_url,
             ),
         ],
+        windows=InstallMethod("winget", "JetBrains.Toolbox"),
     ),
     AppSpec(
         id="vscode",
@@ -29,6 +30,7 @@ IDE_REGISTRY: list[AppSpec] = [
                 distro_family="debian",
             ),
         ],
+        windows=InstallMethod("winget", "Microsoft.VisualStudioCode"),
     ),
     AppSpec(
         id="cursor",
@@ -38,5 +40,6 @@ IDE_REGISTRY: list[AppSpec] = [
         linux=[
             InstallMethod("appimage", TRUSTLIST["cursor"].download_url),
         ],
+        windows=InstallMethod("winget", "Anysphere.Cursor"),
     ),
 ]

@@ -1,39 +1,50 @@
 # workstation-setup
 
 `workstation-setup` is an interactive terminal wizard for bootstrapping a new
-developer machine on Linux or macOS. It packages the setup workflow into one
-native executable: choose the tools you want, review each action, and let the
-wizard run the supported installation path.
+developer machine on Linux, macOS, or Windows. It packages the setup workflow
+into one native executable: choose the tools you want, review each action, and
+let the wizard run the supported installation path.
 
-Windows is deliberately unsupported in v1. The program detects it and exits
-without changing the machine.
+Windows support is native and terminal-based: the wizard uses WinGet rather
+than requiring WSL, Chocolatey, or a graphical frontend.
 
 ## What it can configure
 
 Nothing is mandatory. The menu contains individual, opt-in entries for:
 
 - Homebrew (including Linuxbrew), zsh, Oh My Zsh, Powerlevel10k, and the login shell
-- asdf and selected language plugins
+  on Linux/macOS
+- asdf and selected language plugins on Linux/macOS
 - Git, GitHub CLI, GitHub authentication, and an ed25519 SSH key
 - IDEs: JetBrains Toolbox, VS Code, and Cursor
 - Apps: Google Chrome, Slack, Spotify, Google Cloud SDK, and Devin Desktop
 
-Install support depends on the operating system and Linux distribution. The
-wizard clearly reports an unsupported selection instead of pretending it was
-installed.
+Devin Desktop currently has no Windows install route and is hidden there.
+Other install support depends on the operating system and Linux distribution.
+The wizard clearly reports an unsupported selection instead of pretending it
+was installed.
 
 ## Quick start
 
 Download the binary for your operating system from the
-[latest release](../../releases/latest), make it executable, and start it in a
-real terminal:
+[latest release](../../releases/latest) and start it in a real terminal.
+Linux/macOS:
 
 ```bash
 chmod +x workstation-setup-linux-x86_64 # or workstation-setup-macos-arm64
 ./workstation-setup-linux-x86_64
 ```
 
-The wizard first offers the recommended bootstrap (Homebrew through SSH), then
+Windows 10 1809+ or Windows 11 x64, from PowerShell:
+
+```powershell
+.\workstation-setup-windows-x86_64.exe
+```
+
+Windows requires WinGet, normally supplied by Microsoft App Installer. The
+wizard exits with repair guidance if WinGet is unavailable.
+
+The wizard first offers the platform-appropriate recommended bootstrap, then
 always shows the complete flat menu. You may skip either path and choose only
 the tools you need.
 
@@ -89,42 +100,76 @@ Build a native binary on the target operating system:
 pyinstaller packaging/pyinstaller.spec
 ```
 
-PyInstaller does not cross-compile. Linux and macOS artifacts must be built on
-their respective platforms.
+PyInstaller does not cross-compile. Linux, macOS, and Windows artifacts must be
+built on their respective platforms.
 
-## Test real installs in Docker (Linux)
+## Docker verification
 
-Unit tests do not invoke real installers. To smoke-test the wizard and its
-side-effecting steps in a disposable Ubuntu container:
+The integration environments are intentionally separated:
+
+- `tests/integration/docker/linux/` contains Ubuntu, Fedora, and Arch images.
+  They can exercise the real Linux wizard and package-manager routes.
+- `tests/integration/docker/windows/` uses the official
+  `python:3.12-windowsservercore-ltsc2022` image to validate native Windows
+  tests and PyInstaller packaging.
+
+Docker must be using the matching container daemon. Linux targets require
+Linux containers; Windows targets require Docker Desktop/Engine switched to
+Windows containers. Every build/run/test target checks this first and prints
+how to switch when the active daemon is incompatible.
+
+### Make targets
+
+| Action | Linux | Windows |
+|---|---|---|
+| Build | `make build-linux` | `make build-windows` |
+| Open shell | `make run-linux` | `make run-windows` |
+| Tests | `make test-linux` | `make test-windows` |
+| Clean rebuild | `make rebuild-linux` | `make rebuild-windows` |
+| Stop/remove Compose resources | `make down-linux` | `make down-windows` |
+
+Ubuntu is the default Linux distribution. Select another provider path with,
+for example, `make test-linux DISTRO=fedora` or
+`make rebuild-linux DISTRO=arch`.
+
+The requested positional forms are also supported:
 
 ```bash
-make build
-make run
+make build linux
+make run linux DISTRO=fedora
+make build windows
+make test windows
 ```
 
-`make run` opens a new, automatically removed container. Inside it:
+Other useful commands:
 
 ```bash
-source .venv/bin/activate
-python -m workstation_setup --dry-run
-python -m workstation_setup --only homebrew
+make help       # show all Docker targets
+make validate   # parse/validate both Compose files without building
 ```
 
-After finishing, `make down` removes any compose-managed containers and
-networks. `make rebuild` first cleans compose state and then rebuilds the image
-without cache, which is useful when validating a fully fresh environment after
-source or Dockerfile changes. Use `DISTRO=fedora` or `DISTRO=arch` with any
-target to exercise the `dnf` or `pacman` package-manager paths, for example
-`make rebuild DISTRO=fedora`. Docker cannot validate macOS behavior; use a
-spare Mac, VM, or scratch user account for that. See [the integration-test guide](tests/integration/README.md)
-for the full release smoke-test checklist.
+`make test-linux` runs pytest and Ruff inside the selected Linux image.
+`make test-windows` runs pytest, Ruff, PyInstaller, and
+`dist\workstation-setup.exe --version` inside Windows Server Core.
+
+### Windows container limitation
+
+Windows containers do not provide the Desktop/App Installer user environment
+required by the project's WinGet GUI application routes. The WinGet CLI is
+also not supported in the LocalSystem-style context commonly used by
+containers. Therefore the Windows image validates code, tests, and `.exe`
+packaging, but real Git/WinGet/application installation must still be verified
+in a disposable Windows 10/11 x64 VM with Microsoft App Installer.
+
+See the [integration-test guide](tests/integration/README.md) for the complete
+Linux, Windows, and macOS release checklist.
 
 ## Documentation
 
 - [Usage guide](docs/usage.md) — run the wizard safely and recover from failures
 - [CLI reference](docs/cli-reference.md) — options, examples, and step IDs
 - [Security model](docs/security.md) — curated registry, trust boundaries, and limitations
-- [Integration verification](tests/integration/README.md) — disposable Linux and macOS checks
+- [Integration verification](tests/integration/README.md) — Linux containers and macOS/Windows manual checks
 - [AI Knowledge](docs/ai/README.md) — architecture and safe extension guidance
 
 ## Contributing

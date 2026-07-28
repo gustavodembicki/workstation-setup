@@ -1,4 +1,4 @@
-# Disposable environment for manually smoke-testing the real wizard on
+# Disposable Linux environment for manually smoke-testing the real wizard on
 # Arch — exercises the pacman fallback path for GUI apps.
 # Not part of the automated pytest suite — see tests/integration/README.md.
 FROM archlinux:latest

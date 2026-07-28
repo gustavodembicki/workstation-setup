@@ -8,6 +8,7 @@ from workstation_setup.errors import AbortError
 from workstation_setup.exec import SubprocessRunner
 from workstation_setup.os_detect import detect_os
 from workstation_setup.providers.brew import ensure_brew_on_path
+from workstation_setup.providers.winget import WingetProvider, refresh_windows_path
 from workstation_setup.registry.apps import APP_REGISTRY
 from workstation_setup.registry.ides import IDE_REGISTRY
 from workstation_setup.state import load_state, save_state
@@ -54,6 +55,19 @@ MASTER_REGISTRY: list[Step] = [
 ]
 
 
+def _recommended_prompt(family: str) -> str:
+    if family == "windows":
+        return (
+            "Run the recommended Windows bootstrap first? "
+            "(Git, GitHub CLI + auth, SSH key)"
+        )
+    return (
+        "Run the recommended initial bootstrap first? "
+        "(Homebrew, zsh + Oh My Zsh + theme, default shell, asdf + plugins, "
+        "git, GitHub CLI + auth, SSH key)"
+    )
+
+
 def _filter_steps(steps: list[Step], *, only: tuple[str, ...], skip: tuple[str, ...]) -> list[Step]:
     result = steps
     if only:
@@ -75,17 +89,26 @@ def main(dry_run: bool, assume_yes: bool, only: tuple[str, ...], skip: tuple[str
     try:
         os_info = detect_os()
 
-        if os_info.family not in ("linux", "macos"):
+        if os_info.family not in ("linux", "macos", "windows"):
             log.error(
                 f"workstation-setup does not support {os_info.family} yet "
-                "- only Linux and macOS are supported."
+                "- only Linux, macOS, and Windows are supported."
             )
             log.mark_failed()
             sys.exit(1)
 
-        # Covers the case where Homebrew was already installed in a previous run —
-        # its bin dir may still be missing from this process's PATH.
-        ensure_brew_on_path(os_info)
+        if os_info.family == "windows":
+            if os_info.arch.lower() not in ("amd64", "x86_64"):
+                log.error(
+                    f"workstation-setup supports Windows x64 only (detected: {os_info.arch})."
+                )
+                log.mark_failed()
+                sys.exit(1)
+            refresh_windows_path()
+        else:
+            # Covers the case where Homebrew was already installed in a previous
+            # run — its bin dir may still be missing from this process's PATH.
+            ensure_brew_on_path(os_info)
 
         state = load_state()
 
@@ -99,6 +122,17 @@ def main(dry_run: bool, assume_yes: bool, only: tuple[str, ...], skip: tuple[str
             dry_run=dry_run,
             assume_yes=assume_yes,
         )
+
+        if os_info.family == "windows" and not WingetProvider().is_available(ctx):
+            log.error(
+                "WinGet is required on Windows. Install or repair Microsoft App Installer, "
+                "then run workstation-setup again. If App Installer is already present, "
+                "PowerShell can register it with: Add-AppxPackage "
+                "-RegisterByFamilyName -MainPackage "
+                "Microsoft.DesktopAppInstaller_8wekyb3d8bbwe"
+            )
+            log.mark_failed()
+            sys.exit(1)
 
         log.welcome(f"{ctx.os_info.family} ({ctx.os_info.distro_name or ''})")
 
@@ -118,10 +152,7 @@ def main(dry_run: bool, assume_yes: bool, only: tuple[str, ...], skip: tuple[str
                     )
             else:
                 run_bootstrap = bool(recommended_steps) and prompts.confirm_step(
-                    "Run the recommended initial bootstrap first? "
-                    "(Homebrew, zsh + Oh My Zsh + theme, default shell, asdf + plugins, "
-                    "git, GitHub CLI + auth, SSH key)",
-                    default=True,
+                    _recommended_prompt(os_info.family), default=True
                 )
                 if run_bootstrap:
                     wizard.run_recommended(ctx, recommended_steps)

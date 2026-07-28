@@ -22,6 +22,7 @@ APP_REGISTRY: list[AppSpec] = [
                 ),
             ),
         ],
+        windows=InstallMethod("winget", "Google.Chrome"),
     ),
     AppSpec(
         id="spotify",
@@ -40,6 +41,7 @@ APP_REGISTRY: list[AppSpec] = [
                 ),
             ),
         ],
+        windows=InstallMethod("winget", "Spotify.Spotify"),
     ),
     AppSpec(
         id="slack",
@@ -53,6 +55,7 @@ APP_REGISTRY: list[AppSpec] = [
                 distro_family="debian",
             ),
         ],
+        windows=InstallMethod("winget", "SlackTechnologies.Slack"),
     ),
     AppSpec(
         id="devin_desktop",
@@ -76,5 +79,6 @@ APP_REGISTRY: list[AppSpec] = [
             # arch, and anything else, so it doubles as the generic fallback.
             InstallMethod("script", TRUSTLIST["gcloud_sdk"].download_url),
         ],
+        windows=InstallMethod("winget", "Google.CloudSDK"),
     ),
 ]

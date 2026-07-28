@@ -15,7 +15,7 @@ linked layer for the full contract.
    vendor route. A Linux method may be distro-specific or a generic fallback;
    unsupported is preferable to a fabricated install path.
 4. Add or update registry/dispatch unit tests using `make_context` and
-   `FakeRunner`. Confirm macOS and Linux preview/selection behavior where
+   `FakeRunner`. Confirm macOS, Linux, and Windows preview/selection behavior where
    applicable.
 5. Update user-facing availability or security docs if the new item changes a
    listed capability or trust boundary.
@@ -68,9 +68,8 @@ See [02_steps_and_providers.md](02_steps_and_providers.md) and
 
 ## Windows work
 
-Windows is a future capability, not a conditional to silently fall through.
-When implementing it, add a provider that satisfies `PackageProvider`, define
-the relevant `AppSpec.windows` methods, and make each OS-specific step branch
-explicitly. Update detection, tests, packaging/CI, and public support claims
-together. The existing seam is described in
-[01_architecture.md](01_architecture.md#future-windows-seam).
+Windows routes use exact curated WinGet IDs. Add `AppSpec.windows` only when a
+real package exists; otherwise leave it `None` so the entry is hidden. Keep
+Unix-only steps explicitly inapplicable, refresh the current process PATH
+after WinGet installs, and update Windows unit/manual verification whenever a
+new package or core step is introduced.

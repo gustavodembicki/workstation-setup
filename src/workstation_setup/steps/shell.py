@@ -19,10 +19,17 @@ P10K_SOURCE_LINE = "source $(brew --prefix)/share/powerlevel10k/powerlevel10k.zs
 SHELLS_FILE = Path("/etc/shells")
 
 
+def _is_unix(ctx: RunContext) -> bool:
+    return ctx.os_info.family in ("linux", "macos")
+
+
 class InstallZshStep(Step):
     id = "zsh"
     title = "zsh"
     description = "Install zsh via Homebrew."
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return _is_unix(ctx)
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
         if command_exists("zsh"):
@@ -44,6 +51,9 @@ class InstallOhMyZshStep(Step):
     id = "oh-my-zsh"
     title = "Oh My Zsh"
     description = "Install the Oh My Zsh framework for zsh configuration."
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return _is_unix(ctx)
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
         if (Path.home() / ".oh-my-zsh").exists():
@@ -69,6 +79,9 @@ class ConfigureZshThemeStep(Step):
     id = "zsh-theme"
     title = "ZSH theme"
     description = "Choose and configure an oh-my-zsh theme in ~/.zshrc."
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return _is_unix(ctx)
 
     def _zshrc(self) -> Path:
         return Path.home() / ".zshrc"
@@ -125,6 +138,9 @@ class SetDefaultShellStep(Step):
         "Change your login shell to zsh via chsh. This affects how you log in "
         "from now on — make sure that's what you want before confirming."
     )
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return _is_unix(ctx)
 
     def _target_zsh_path(self, ctx: RunContext) -> str:
         found = shutil.which("zsh")

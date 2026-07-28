@@ -21,8 +21,8 @@
 │one   │───▶│PackageProv-│  │AppSpec /   │  │prompts.py│
 │Step  │    │ider: brew, │  │InstallMeth-│  │(thin,    │
 │class │    │apt/dnf/    │  │od (data-   │  │mockable  │
-│per   │    │pacman      │  │driven app/ │  │wrapper   │
-│unit  │    │            │  │IDE list)   │  │around    │
+│per   │    │pacman/     │  │driven app/ │  │wrapper   │
+│unit  │    │winget      │  │IDE list)   │  │around    │
 │      │    │            │  │            │  │questionary)│
 └──┬───┘    └─────┬──────┘  └────────────┘  └──────────┘
    │              │
@@ -66,6 +66,7 @@ src/workstation_setup/
 │   ├── base.py                # PackageProvider Protocol
 │   ├── brew.py                 # BrewProvider (install + reinstall) + resolve_brew_binary + ensure_brew_on_path
 │   ├── apt.py / dnf.py / pacman.py  # Linux fallback providers
+│   ├── winget.py              # Windows provider + current-process PATH refresh
 │   └── registry.py              # get_brew_provider() / get_system_provider(os_info)
 │
 ├── steps/
@@ -135,12 +136,11 @@ Shared by both `run_recommended` (walks `RECOMMENDED_PIPELINE` in order) and
 7. after all steps: print summary table, save_state(ctx.state)
 ```
 
-## Future Windows seam
+## Windows implementation
 
-Not implemented in v1, but the following exist specifically so adding it later doesn't require a rewrite:
-
-- `os_detect.OSInfo.family` is typed as `Literal["linux", "macos", "windows"]` — `detect_os()` already returns `"windows"` correctly, it's just that `cli.py` bails out early when it sees it.
-- `registry.models.AppSpec.windows: InstallMethod | None = None` — every registry entry already has the field, just unset.
-- `providers.base.PackageProvider` is a `Protocol` — a future `providers/winget.py` implementing it would slot in next to `brew.py`/`apt.py` without touching the interface.
-
-When picking this up: the main work is a `WindowsProvider`, `AppSpec.windows` entries for the existing registry, and a `windows` branch in each `Step.run` that currently only branches on `macos`/`linux` (mainly `steps/homebrew.py`, `steps/shell.py`, `steps/gui_apps.py`, `steps/app_spec_step.py`).
+`WingetProvider` implements the package-provider contract and uses exact
+package IDs for live detection/install/reinstall. `AppSpec.windows` is
+optional; `AppSpecStep.is_applicable` hides entries without a Windows route.
+Unix-only steps use explicit applicability gates. After WinGet installs a
+package, `refresh_windows_path()` reloads persisted environment paths and adds
+the Git/GitHub CLI tool directories needed by later steps in the same run.

@@ -15,6 +15,7 @@ InstallKind = Literal[
     "appimage",
     "tarball",
     "script",
+    "winget",
 ]
 
 
@@ -40,5 +41,4 @@ class AppSpec:
     check: Callable[[RunContext], bool]
     macos: InstallMethod
     linux: list[InstallMethod] = field(default_factory=list)
-    # Seam for a future Windows provider; intentionally unused in v1.
     windows: InstallMethod | None = None

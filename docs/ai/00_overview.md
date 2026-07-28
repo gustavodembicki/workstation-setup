@@ -6,8 +6,8 @@ Setting up a new developer machine after a fresh OS install is slow and manual: 
 
 ## Scope
 
-- **Supported:** Linux and macOS. These are treated as close cousins throughout the codebase — Homebrew (Linuxbrew on Linux) is the primary installer on both.
-- **Not supported (v1):** Windows. `cli.py` detects this and exits with a clear message rather than attempting anything. The architecture leaves a seam (`OSInfo.family` already includes `"windows"`, `AppSpec.windows` field exists but is unused) for a future Windows provider — see [01_architecture.md](01_architecture.md#future-windows-seam).
+- **Supported:** Linux and macOS through Homebrew/native distro providers, plus Windows 10 1809+/Windows 11 x64 through WinGet.
+- **Windows boundaries:** native CLI only; no WSL/GUI frontend, ARM64, or Server support. Unix-only shell/asdf steps are filtered out.
 
 ## Tech stack
 
@@ -26,13 +26,13 @@ reinstall/modify it, leave it alone, or cancel. See
 [02_steps_and_providers.md](02_steps_and_providers.md) for why that matters.
 
 ```
-1. cli.py: detect_os() → bail early with a friendly message if not linux/macos
-2. ensure_brew_on_path() — in case Homebrew is already installed from a prior run
+1. cli.py: detect_os() → validate the supported platform/architecture and Windows WinGet prerequisite
+2. Refresh the platform PATH (`ensure_brew_on_path` or `refresh_windows_path`)
 3. Build RunContext (real SubprocessRunner, real Console, loaded state.json)
-4. Ask once: "Run the recommended initial bootstrap first?" (Homebrew → zsh →
+4. Ask once: "Run the recommended initial bootstrap first?" (on Unix: Homebrew → zsh →
    Oh My Zsh → theme → set default shell → asdf → asdf plugins → git → gh →
    gh auth login → SSH key, in that order — RECOMMENDED_PIPELINE). This is a
-   convenience fast path, not a gate:
+   convenience fast path, not a gate. Windows filters this to git → gh → auth → SSH:
      - yes → wizard.run_recommended(ctx, RECOMMENDED_PIPELINE) walks that
        list in order. NOT_INSTALLED items get the usual confirm-then-run.
        ALREADY_INSTALLED items get a Reinstall/Modify, Leave as is, or

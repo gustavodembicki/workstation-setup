@@ -18,10 +18,17 @@ OTHER_CHOICE = "__other__"
 ALREADY_ADDED_MARKER = "already added"
 
 
+def _is_unix(ctx: RunContext) -> bool:
+    return ctx.os_info.family in ("linux", "macos")
+
+
 class InstallAsdfStep(Step):
     id = "asdf"
     title = "asdf"
     description = "Install the asdf version manager via Homebrew."
+
+    def is_applicable(self, ctx: RunContext) -> bool:
+        return _is_unix(ctx)
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
         if command_exists("asdf"):
@@ -45,7 +52,7 @@ class AsdfPluginsStep(Step):
     description = "Add asdf plugins for the language runtimes you use."
 
     def is_applicable(self, ctx: RunContext) -> bool:
-        return command_exists("asdf")
+        return _is_unix(ctx) and command_exists("asdf")
 
     def check_installed(self, ctx: RunContext) -> StepStatus:
         # Always offered — picking no plugins is a valid, repeatable no-op.

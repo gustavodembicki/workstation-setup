@@ -4,7 +4,7 @@ Layered documentation for AI agents. Load only the file(s) relevant to your task
 
 | File | What it covers |
 |------|----------------|
-| [00_overview.md](00_overview.md) | Why this exists, scope (Linux/macOS only), tech stack, high-level flow |
+| [00_overview.md](00_overview.md) | Why this exists, supported platforms, tech stack, high-level flow |
 | [01_architecture.md](01_architecture.md) | Module map, the Step/Provider/Registry abstractions, wizard orchestration |
 | [02_steps_and_providers.md](02_steps_and_providers.md) | Step contract, idempotency model, PackageProvider, PATH gotcha |
 | [03_registry_apps_ides.md](03_registry_apps_ides.md) | AppSpec/InstallMethod model, how to add a new app or IDE |

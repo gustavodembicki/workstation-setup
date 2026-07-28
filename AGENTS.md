@@ -8,7 +8,8 @@ A "format the laptop, run one binary, get a working dev environment" tool. Nothi
 
 **Tech stack:** Python 3.11+, `click` (CLI), `questionary` (interactive prompts), `rich` (console output), `pytest` (tests), `ruff` (lint/format), `pyinstaller` (packaging).
 
-**Scope:** Linux and macOS only. Windows is explicitly out of scope for v1 — see [`docs/ai/01_architecture.md`](docs/ai/01_architecture.md) for the seam left for a future Windows provider.
+**Scope:** Linux, macOS, and Windows 10/11 x64. Windows is a native CLI target
+through WinGet; WSL, Windows ARM64, and Windows Server are out of scope.
 
 **Detailed AI context:** See [`docs/ai/`](docs/ai/README.md) for layered documentation covering architecture, the Step/Provider/Registry model, testing patterns, and packaging/CI.
 
@@ -27,7 +28,7 @@ log.py                  — the ONLY place output/logging happens: a module-leve
                           needed). Also owns ~/.workstation-setup/run.log — written during the run, deleted
                           on clean success, kept (and its path reported) whenever a run fails or is aborted.
 
-providers/               — PackageProvider abstraction: brew (primary, both OSes; install + reinstall), apt/dnf/pacman (Linux fallback)
+providers/               — PackageProvider abstraction: brew (Linux/macOS), apt/dnf/pacman (Linux fallback), winget (Windows)
 steps/                    — one Step per installable unit (homebrew, shell, asdf, git_gh, ssh, gui_apps dispatcher, app_spec_step adapter)
 registry/                  — data-driven AppSpec list for GUI apps + IDEs (the extensibility seam)
 ui/                         — thin, mockable wrapper around questionary (prompts.py, incl. select_existing_action)
