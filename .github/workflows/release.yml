@@ -23,7 +23,7 @@ jobs:
         name: Derive unique pre-release version
         shell: bash
         run: |
-          base_version="$(python -c \"import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])\")"
+          base_version="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])")"
           echo "release_tag=v${base_version}-dev.${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
 
   validate:
