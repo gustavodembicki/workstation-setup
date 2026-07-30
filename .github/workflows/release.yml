@@ -98,8 +98,9 @@ jobs:
           EXPECTED_VERSION: ${{ needs.prepare.outputs.release_tag }}
         run: >
           python -c "import os, subprocess;
-          assert subprocess.check_output(['dist/${{ matrix.built_name }}', '--version'], text=True).strip()
-          == os.environ['EXPECTED_VERSION']"
+          actual = subprocess.check_output(['dist/${{ matrix.built_name }}', '--version'], text=True).strip();
+          expected = 'workstation-setup, version ' + os.environ['EXPECTED_VERSION'];
+          assert actual == expected, (actual, expected)"
 
       - name: Rename artifact
         run: python -c "from pathlib import Path; Path('dist/${{ matrix.built_name }}').replace('dist/${{ matrix.artifact_name }}')"

@@ -42,7 +42,7 @@ def test_version_flag_prints_version():
     result = CliRunner().invoke(cli.main, ["--version"])
 
     assert result.exit_code == 0
-    assert "workstation-setup" in result.output
+    assert result.output.strip() == f"workstation-setup, version {cli.__version__}"
 
 
 def test_main_runs_on_windows_when_winget_is_available(monkeypatch):
