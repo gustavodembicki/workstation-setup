@@ -19,10 +19,10 @@ Build locally: `pyinstaller packaging/pyinstaller.spec` → binary lands in
 
 ## CI workflows
 
-- **`.github/workflows/ci.yml`** — runs lint/tests on Ubuntu, macOS, and Windows.
-- **`.github/workflows/release.yml`** — builds Linux x86_64, macOS ARM64, and Windows x86_64 artifacts, smoke-tests `--version`, then publishes them.
+- **`.github/workflows/ci.yml`** — runs lint/tests for pull requests.
+- **`.github/workflows/release.yml`** — every push to `master` validates and builds Linux x86_64, Windows x86_64, macOS Intel x86_64 (`macos-15-intel`), and macOS Apple Silicon ARM64 (`macos-14`) artifacts. It smoke-tests their version, publishes a unique GitHub pre-release, and attaches `SHA256SUMS`.
 
-## Before tagging a release
+## Before merging to `master`
 
 1. `pytest tests/unit` and `ruff check .` green on all three OSes (CI).
 2. A local `pyinstaller` build smoke test (`--version`, `--dry-run`) on at least one real OS.
