@@ -2,10 +2,59 @@ name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: ["master"]
+
+permissions:
+  contents: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.version.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - id: version
+        name: Derive unique pre-release version
+        shell: bash
+        run: |
+          base_version="$(python -c \"import tomllib; print(tomllib.load(open('pyproject.toml', 'rb'))['project']['version'])\")"
+          echo "release_tag=v${base_version}-dev.${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+  validate:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+          - os: macos-15-intel
+          - os: macos-14
+          - os: windows-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package (dev extras)
+        run: pip install -e ".[dev]"
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest --cov=workstation_setup tests/unit
+
   build:
+    needs: [prepare, validate]
     strategy:
       fail-fast: false
       matrix:
@@ -13,7 +62,10 @@ jobs:
           - os: ubuntu-latest
             artifact_name: workstation-setup-linux-x86_64
             built_name: workstation-setup
-          - os: macos-latest
+          - os: macos-15-intel
+            artifact_name: workstation-setup-macos-x86_64
+            built_name: workstation-setup
+          - os: macos-14
             artifact_name: workstation-setup-macos-arm64
             built_name: workstation-setup
           - os: windows-latest
@@ -30,11 +82,24 @@ jobs:
       - name: Install package (dev extras)
         run: pip install -e ".[dev]"
 
+      - name: Embed release version
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: >
+          python -c 'import os; from pathlib import Path;
+          Path("src/workstation_setup/_build_version.py").write_text(
+          "__version__ = " + repr(os.environ["RELEASE_TAG"]) + "\\n")'
+
       - name: Build standalone executable
         run: pyinstaller packaging/pyinstaller.spec
 
       - name: Smoke-test standalone executable
-        run: python -c "import subprocess; subprocess.run(['dist/${{ matrix.built_name }}', '--version'], check=True)"
+        env:
+          EXPECTED_VERSION: ${{ needs.prepare.outputs.release_tag }}
+        run: >
+          python -c "import os, subprocess;
+          assert subprocess.check_output(['dist/${{ matrix.built_name }}', '--version'], text=True).strip()
+          == os.environ['EXPECTED_VERSION']"
 
       - name: Rename artifact
         run: python -c "from pathlib import Path; Path('dist/${{ matrix.built_name }}').replace('dist/${{ matrix.artifact_name }}')"
@@ -45,13 +110,27 @@ jobs:
           path: dist/${{ matrix.artifact_name }}
 
   release:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: dist
 
+      - name: Generate SHA-256 checksums
+        shell: bash
+        run: |
+          cd dist
+          for file in */workstation-setup-*; do
+            sha256sum "$file" | sed "s#  $file#  ${file##*/}#"
+          done > SHA256SUMS
+
       - uses: softprops/action-gh-release@v2
         with:
-          files: dist/**/workstation-setup-*
+          tag_name: ${{ needs.prepare.outputs.release_tag }}
+          name: ${{ needs.prepare.outputs.release_tag }}
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            dist/**/workstation-setup-*
+            dist/SHA256SUMS
