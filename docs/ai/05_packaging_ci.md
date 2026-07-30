@@ -12,7 +12,11 @@ One spec file is used identically by all three CI runners. PyInstaller emits
 ELF, Mach-O, or PE/`.exe` from the actual build platform.
 
 - `SPECPATH` (a PyInstaller-provided variable, not a Python builtin) is used to locate `src/` relative to the spec file's own location, so `pyinstaller packaging/pyinstaller.spec` works regardless of the caller's current directory.
-- `hiddenimports=["questionary", "prompt_toolkit", "rich"]` — these are listed explicitly because `questionary`/`prompt_toolkit` lazily import some renderer/style modules that PyInstaller's static analysis can miss. If a future dependency exhibits the same "works with `python -m workstation_setup` but the built binary crashes with an ImportError" symptom, add it here rather than restructuring the import.
+- `hiddenimports` explicitly includes `questionary`, `prompt_toolkit`, `rich`,
+  and the release-only `workstation_setup._build_version` module. The first
+  group covers lazy imports that static analysis can miss; the generated
+  version module ensures release binaries retain their unique pre-release
+  version.
 
 Build locally: `pyinstaller packaging/pyinstaller.spec` → binary lands in
 `dist/workstation-setup` or `dist/workstation-setup.exe`.
@@ -20,7 +24,7 @@ Build locally: `pyinstaller packaging/pyinstaller.spec` → binary lands in
 ## CI workflows
 
 - **`.github/workflows/ci.yml`** — runs lint/tests for pull requests.
-- **`.github/workflows/release.yml`** — every push to `master` validates and builds Linux x86_64, Windows x86_64, macOS Intel x86_64 (`macos-15-intel`), and macOS Apple Silicon ARM64 (`macos-14`) artifacts. It smoke-tests their version, publishes a unique GitHub pre-release, and attaches `SHA256SUMS`.
+- **`.github/workflows/release.yml`** — every push to `master` validates and builds Linux x86_64, Windows x86_64, macOS Intel x86_64 (`macos-15-intel`), and macOS Apple Silicon ARM64 (`macos-14`) artifacts. Before each clean PyInstaller build, it generates and compiles the release-version module; it then smoke-tests the frozen binary's exact version, publishes a unique GitHub pre-release, and attaches `SHA256SUMS`.
 
 ## Before merging to `master`
 
