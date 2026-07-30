@@ -88,10 +88,20 @@ jobs:
         run: >
           python -c 'import os; from pathlib import Path;
           Path("src/workstation_setup/_build_version.py").write_text(
-          "__version__ = " + repr(os.environ["RELEASE_TAG"]) + "\\n")'
+          "__version__ = " + repr(os.environ["RELEASE_TAG"]) + chr(10))'
+
+      - name: Verify embedded release version module
+        env:
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: >
+          python -m py_compile src/workstation_setup/_build_version.py
+          && python -c 'import os;
+          from workstation_setup._build_version import __version__;
+          expected = os.environ["RELEASE_TAG"];
+          assert __version__ == expected, (__version__, expected)'
 
       - name: Build standalone executable
-        run: pyinstaller packaging/pyinstaller.spec
+        run: pyinstaller --clean packaging/pyinstaller.spec
 
       - name: Smoke-test standalone executable
         env:
