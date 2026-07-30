@@ -14,7 +14,15 @@ a = Analysis(
     datas=[],
     # questionary/prompt_toolkit lazily import some renderer/style modules
     # that PyInstaller's static analysis can miss; listed explicitly here.
-    hiddenimports=["questionary", "prompt_toolkit", "rich"],
+    hiddenimports=[
+        "questionary",
+        "prompt_toolkit",
+        "rich",
+        # This module is created by the release workflow immediately before the
+        # build.  It is optional in source checkouts, so make its inclusion
+        # explicit when it is present for a release build.
+        "workstation_setup._build_version",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
