@@ -155,5 +155,7 @@ Run the release `.exe` from PowerShell and verify `--version`, a full
 `--dry-run`, `--yes --only git --only gh`, interactive GitHub authentication,
 SSH-key generation, and one WinGet-backed GUI app. Run the same package twice
 and confirm the second selection offers Reinstall/Modify, Leave as is, or
-Cancel. Also verify that a VM without WinGet exits with App Installer repair
-guidance and makes no installation attempt.
+Cancel. Also launch the `.exe` from Explorer, install one item, confirm the
+menu reappears with refreshed status, and select Exit to close. Verify that a
+VM without WinGet exits with App Installer repair guidance and makes no
+installation attempt.

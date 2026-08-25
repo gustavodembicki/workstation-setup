@@ -38,14 +38,15 @@ reinstall/modify it, leave it alone, or cancel. See
        ALREADY_INSTALLED items get a Reinstall/Modify, Leave as is, or
        Cancel prompt — never a silent skip.
      - no  → straight to step 5.
-5. wizard.run_menu(ctx, MASTER_REGISTRY) — the big list of possibilities:
+5. wizard.run_menu(ctx, MASTER_REGISTRY) — the recurring list of possibilities:
    one checkbox menu with every entry (nothing pre-checked, whether or not
    it's already installed), annotated "(already installed)" where that
    applies. Whatever the user checks gets acted on: NOT_INSTALLED items run
    directly (the checkbox is the confirmation), ALREADY_INSTALLED items get
-   the same Reinstall/Modify/Leave/Cancel prompt as step 4. This runs
-   regardless of what happened in step 4 — recommended items show up here
-   too, so nothing is ever only-offered-once.
+   the same Reinstall/Modify/Leave/Cancel prompt as step 4. After each batch,
+   applicability and live status are refreshed and the menu is shown again.
+   Selecting Exit (alone or with a final batch), or submitting an empty
+   selection, finishes the session.
 6. save_state(ctx.state)
 ```
 

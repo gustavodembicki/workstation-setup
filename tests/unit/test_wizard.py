@@ -180,6 +180,24 @@ def test_recommended_failed_step_continues_when_user_agrees_to_continue():
 # ---- run_menu -------------------------------------------------------------
 
 
+def test_menu_returns_after_processing_a_selection_until_user_exits():
+    ctx = make_context()
+    step = FakeStep("chrome")
+    selections = iter([["chrome"], []])
+    prompt_count = 0
+
+    def checkbox_fn(message, choices):
+        nonlocal prompt_count
+        prompt_count += 1
+        return next(selections)
+
+    results = wizard.run_menu(ctx, [step], checkbox_fn=checkbox_fn)
+
+    assert prompt_count == 2
+    assert step.run_calls == [False]
+    assert results == [(step, StepResult(StepStatus.INSTALLED))]
+
+
 def test_menu_nothing_pre_checked_only_selected_items_are_processed():
     ctx = make_context()
     a = FakeStep("a")
@@ -188,7 +206,7 @@ def test_menu_nothing_pre_checked_only_selected_items_are_processed():
 
     def checkbox_fn(message, choices):
         captured_choices["choices"] = choices
-        return ["a"]  # only "a" selected, "b" left unchecked
+        return ["a", wizard._EXIT_MENU_ID]  # only "a" selected, then exit
 
     results = wizard.run_menu(ctx, [a, b], checkbox_fn=checkbox_fn)
 
@@ -209,7 +227,56 @@ def test_menu_not_applicable_step_is_excluded_from_the_checkbox():
 
     wizard.run_menu(ctx, [step], checkbox_fn=checkbox_fn)
 
-    assert captured_choices["choices"] == []
+    assert [choice.value for choice in captured_choices["choices"]] == [wizard._EXIT_MENU_ID]
+
+
+def test_menu_exit_choice_alone_finishes_without_running_a_step():
+    ctx = make_context()
+    step = FakeStep("chrome")
+
+    results = wizard.run_menu(
+        ctx,
+        [step],
+        checkbox_fn=lambda message, choices: [wizard._EXIT_MENU_ID],
+    )
+
+    assert step.run_called is False
+    assert results == []
+
+
+def test_menu_rechecks_status_and_applicability_before_showing_the_next_round():
+    ctx = make_context()
+    installer = FakeStep("gh")
+    unlocked = FakeStep("gh-auth", applicable=False)
+    check_count = 0
+    prompt_count = 0
+
+    def installer_check(ctx):
+        nonlocal check_count
+        check_count += 1
+        return StepStatus.ALREADY_INSTALLED if installer.run_called else StepStatus.NOT_INSTALLED
+
+    installer.check_installed = installer_check
+    unlocked.is_applicable = lambda ctx: installer.run_called
+
+    def checkbox_fn(message, choices):
+        nonlocal prompt_count
+        prompt_count += 1
+        if prompt_count == 1:
+            assert [choice.value for choice in choices] == ["gh", wizard._EXIT_MENU_ID]
+            return ["gh"]
+        assert [choice.value for choice in choices] == [
+            "gh",
+            "gh-auth",
+            wizard._EXIT_MENU_ID,
+        ]
+        assert choices[0].title == "gh (already installed)"
+        return [wizard._EXIT_MENU_ID]
+
+    wizard.run_menu(ctx, [installer, unlocked], checkbox_fn=checkbox_fn)
+
+    assert prompt_count == 2
+    assert check_count == 2
 
 
 def test_menu_selecting_an_already_installed_item_prompts_for_an_action():
@@ -219,7 +286,7 @@ def test_menu_selecting_an_already_installed_item_prompts_for_an_action():
     results = wizard.run_menu(
         ctx,
         [step],
-        checkbox_fn=lambda message, choices: ["zsh"],
+        checkbox_fn=lambda message, choices: ["zsh", wizard._EXIT_MENU_ID],
         action_fn=lambda title: ExistingAction.REINSTALL,
     )
 
@@ -235,7 +302,7 @@ def test_menu_selecting_a_not_installed_item_just_runs_it_no_extra_confirm():
     results = wizard.run_menu(
         ctx,
         [step],
-        checkbox_fn=lambda message, choices: ["chrome"],
+        checkbox_fn=lambda message, choices: ["chrome", wizard._EXIT_MENU_ID],
         confirm_fn=lambda msg: pytest.fail("selection itself is the confirmation"),
     )
 
@@ -248,10 +315,11 @@ def test_menu_failure_does_not_abort_remaining_selected_items():
     failing = FakeStep("chrome", raises=StepError("boom", stderr="network"))
     next_step = FakeStep("slack")
 
+    selections = iter([["chrome", "slack"], [wizard._EXIT_MENU_ID]])
     results = wizard.run_menu(
         ctx,
         [failing, next_step],
-        checkbox_fn=lambda message, choices: ["chrome", "slack"],
+        checkbox_fn=lambda message, choices: next(selections),
         confirm_fn=lambda msg: pytest.fail("run_menu never asks to keep going"),
     )
 
