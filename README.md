@@ -45,8 +45,9 @@ Windows requires WinGet, normally supplied by Microsoft App Installer. The
 wizard exits with repair guidance if WinGet is unavailable.
 
 The wizard first offers the platform-appropriate recommended bootstrap, then
-always shows the complete flat menu. You may skip either path and choose only
-the tools you need.
+shows the complete flat menu. After each selected batch, it refreshes live
+installation status and returns to the menu so you can choose more tools or
+select **Exit** to finish.
 
 Useful commands:
 

@@ -102,7 +102,8 @@ Homebrew/zsh/etc. in one `MASTER_REGISTRY` — see
 ## Wizard step lifecycle (detailed)
 
 Shared by both `run_recommended` (walks `RECOMMENDED_PIPELINE` in order) and
-`run_menu` (the flat checkbox over `MASTER_REGISTRY`, nothing pre-checked):
+each batch of `run_menu` (the recurring flat checkbox over `MASTER_REGISTRY`,
+nothing pre-checked):
 
 ```
 1. is_applicable(ctx)?
@@ -133,7 +134,9 @@ Shared by both `run_recommended` (walks `RECOMMENDED_PIPELINE` in order) and
      run_menu: no abort prompt — selections are independent, so it just
        records "failed" and continues with the rest of the selection
 
-7. after all steps: print summary table, save_state(ctx.state)
+7. after a menu batch: print its summary, refresh applicability/live status,
+   and show the menu again; Exit or an empty selection finishes the session
+8. after all steps: save_state(ctx.state)
 ```
 
 ## Windows implementation

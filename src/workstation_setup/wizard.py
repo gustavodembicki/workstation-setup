@@ -15,6 +15,14 @@ ActionFn = Callable[[str], ExistingAction]
 
 Results = list[tuple[Step, StepResult]]
 
+_EXIT_MENU_ID = "__exit__"
+
+
+def _menu_label(step: Step, status: StepStatus) -> str:
+    if status == StepStatus.ALREADY_INSTALLED:
+        return f"{step.title} (already installed)"
+    return step.title
+
 
 def _execute_step(ctx: RunContext, step: Step, *, reinstall: bool = False) -> StepResult:
     """Run a Step for real, reporting/recording the outcome either way.
@@ -35,9 +43,7 @@ def _execute_step(ctx: RunContext, step: Step, *, reinstall: bool = False) -> St
         return result
 
 
-def _resolve_already_installed(
-    ctx: RunContext, step: Step, *, action_fn: ActionFn
-) -> StepResult:
+def _resolve_already_installed(ctx: RunContext, step: Step, *, action_fn: ActionFn) -> StepResult:
     """A Step reported ALREADY_INSTALLED — never treat that as "nothing to
     do" on its own. Ask the user for a real decision instead of silently
     skipping (that silent skip was the whole bug being fixed here).
@@ -121,51 +127,66 @@ def run_menu(
     action_fn: ActionFn = prompts.select_existing_action,
     checkbox_fn: Callable[[str, list[questionary.Choice]], list[str]] = prompts.checkbox_select,
 ) -> Results:
-    """The master menu: every installable thing (core tooling, IDEs,
-    everyday apps) in one flat, non-mandatory checklist. Nothing is
-    pre-checked -- the user opts into whatever they want this run, whether
-    or not it's already installed.
+    """The recurring master menu: every installable thing (core tooling,
+    IDEs, everyday apps) in one flat, non-mandatory checklist. Nothing is
+    pre-checked -- after each batch, live status and applicability are
+    refreshed before the menu is shown again. The user exits explicitly or
+    by submitting an empty selection.
     """
-    applicable = [s for s in steps if s.is_applicable(ctx)]
-    statuses: dict[str, StepStatus] = {}
-    for step in applicable:
-        with log.task(f"Checking {step.title}..."):
-            statuses[step.id] = step.check_installed(ctx)
+    results: Results = []
 
-    if ctx.dry_run:
-        log.info("\n[bold]Everything available to install/reinstall/modify:[/bold]")
-        results: Results = []
+    while True:
+        applicable = [s for s in steps if s.is_applicable(ctx)]
+        statuses: dict[str, StepStatus] = {}
         for step in applicable:
-            already = statuses[step.id] == StepStatus.ALREADY_INSTALLED
-            note = " (already installed)" if already else ""
-            log.info(f"  - {step.title}{note}")
-            for line in step.dry_run_preview(ctx):
-                log.dry_run_line(line, indent=6)
-            results.append((step, StepResult(statuses[step.id], detail="dry-run preview")))
-        return results
+            with log.task(f"Checking {step.title}..."):
+                statuses[step.id] = step.check_installed(ctx)
 
-    def _label(step: Step) -> str:
-        if statuses[step.id] == StepStatus.ALREADY_INSTALLED:
-            return f"{step.title} (already installed)"
-        return step.title
+        if ctx.dry_run:
+            log.info("\n[bold]Everything available to install/reinstall/modify:[/bold]")
+            for step in applicable:
+                already = statuses[step.id] == StepStatus.ALREADY_INSTALLED
+                note = " (already installed)" if already else ""
+                log.info(f"  - {step.title}{note}")
+                for line in step.dry_run_preview(ctx):
+                    log.dry_run_line(line, indent=6)
+                results.append((step, StepResult(statuses[step.id], detail="dry-run preview")))
+            return results
 
-    choices = [
-        questionary.Choice(title=_label(step), value=step.id, checked=False) for step in applicable
-    ]
-    selected_ids = set(checkbox_fn("Select anything to install, reinstall, or modify:", choices))
+        choices = [
+            questionary.Choice(
+                title=_menu_label(step, statuses[step.id]), value=step.id, checked=False
+            )
+            for step in applicable
+        ]
+        choices.append(questionary.Choice(title="Exit", value=_EXIT_MENU_ID, checked=False))
+        selected_ids = set(
+            checkbox_fn(
+                "Select anything to install, reinstall, or modify (or Exit to finish):",
+                choices,
+            )
+        )
+        exit_requested = _EXIT_MENU_ID in selected_ids
+        selected_step_ids = selected_ids & {step.id for step in applicable}
 
-    results = []
-    for step in applicable:
-        if step.id not in selected_ids:
-            continue
+        if not selected_step_ids:
+            return results
 
-        log.step_header(step)
-        status = statuses[step.id]
-        if status == StepStatus.ALREADY_INSTALLED:
-            result = _resolve_already_installed(ctx, step, action_fn=action_fn)
-        else:
-            result = _execute_step(ctx, step)
-        results.append((step, result))
+        batch_results: Results = []
+        for step in applicable:
+            if step.id not in selected_step_ids:
+                continue
 
-    log.summary_table(results)
-    return results
+            log.step_header(step)
+            status = statuses[step.id]
+            if status == StepStatus.ALREADY_INSTALLED:
+                result = _resolve_already_installed(ctx, step, action_fn=action_fn)
+            else:
+                result = _execute_step(ctx, step)
+            batch_results.append((step, result))
+
+        log.summary_table(batch_results)
+        results.extend(batch_results)
+
+        if exit_requested:
+            return results

@@ -27,10 +27,14 @@ development dependencies described in the [README](../README.md).
    separately confirmed.
 5. Use the master menu that follows to select any individual tool, IDE, or app.
    Nothing is selected by default.
-6. Review the summary printed after each phase.
+6. Review the summary for the selected batch. The wizard refreshes live status
+   and returns to the menu so newly available actions can appear.
+7. Select **Exit** when finished. If Exit is selected with other items, the
+   wizard processes that final batch before closing.
 
-The master menu is shown even after accepting the recommended bootstrap, so
-you can add applications in the same run.
+The master menu is shown even after accepting the recommended bootstrap and
+again after each selected batch, so you can add applications in the same run.
+Submitting an empty selection also exits safely.
 
 ## Re-running the wizard
 
